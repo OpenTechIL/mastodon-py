@@ -84,7 +84,7 @@ async def unmute(
             Mute.target_account_id == target.id,
         )
     )
-    if not result.rowcount:
+    if not result.rowcount:  # type: ignore[attr-defined]
         return False
     await session.commit()
     return True

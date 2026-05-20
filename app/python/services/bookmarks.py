@@ -64,4 +64,4 @@ async def unbookmark(
         )
     )
     await session.commit()
-    return result.rowcount > 0
+    return result.rowcount > 0  # type: ignore[attr-defined]

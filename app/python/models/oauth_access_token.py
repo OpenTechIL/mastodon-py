@@ -32,14 +32,14 @@ class OAuthAccessToken(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     last_used_ip: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    application: Mapped[OAuthApplication | None] = relationship(  # type: ignore[name-defined]
+    application: Mapped[OAuthApplication | None] = relationship(
         "OAuthApplication",
         primaryjoin="OAuthAccessToken.application_id == OAuthApplication.id",
         foreign_keys=lambda: [OAuthAccessToken.application_id],
         lazy="joined",
         viewonly=True,
     )
-    user: Mapped[User | None] = relationship(  # type: ignore[name-defined]
+    user: Mapped[User | None] = relationship(
         "User",
         primaryjoin="OAuthAccessToken.resource_owner_id == User.id",
         foreign_keys=lambda: [OAuthAccessToken.resource_owner_id],

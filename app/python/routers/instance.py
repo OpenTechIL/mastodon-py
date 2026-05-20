@@ -441,7 +441,7 @@ async def trends_tags(session: DBSession) -> list[dict[str, Any]]:
         }
 
     result = []
-    for row in top_rows:
+    for row in top_rows:  # type: ignore[assignment]
         # Mastodon returns history newest-first: index 0 = today, index 1 = yesterday…
         history = []
         for offset in range(7):
@@ -489,11 +489,6 @@ async def annual_reports(account: CurrentAccount) -> list[dict[str, Any]]:
 @router.post("/api/v1/annual_reports/{year}/read", status_code=200)
 async def read_annual_report(year: int, account: CurrentAccount) -> dict[str, Any]:
     return {}
-
-
-@router.get("/api/v1/annual_reports/{year}/state")
-async def annual_report_state(year: int, account: CurrentAccount) -> dict[str, Any]:
-    return {"year": year, "state": "not_generated"}
 
 
 @router.post("/api/v1/annual_reports/{year}/generate", status_code=200)

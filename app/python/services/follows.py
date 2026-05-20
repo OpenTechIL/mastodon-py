@@ -298,7 +298,7 @@ async def reject_follow_request(
             FollowRequest.target_account_id == target.id,
         )
     )
-    if not result.rowcount:
+    if not result.rowcount:  # type: ignore[attr-defined]
         return False
     await session.commit()
     return True
@@ -345,7 +345,7 @@ async def unfollow(
             Follow.target_account_id == target.id,
         )
     )
-    if follow_result.rowcount:
+    if follow_result.rowcount:  # type: ignore[attr-defined]
         await adjust_counter(
             session,
             table="account_stats",
@@ -372,7 +372,7 @@ async def unfollow(
             FollowRequest.target_account_id == target.id,
         )
     )
-    if request_result.rowcount:
+    if request_result.rowcount:  # type: ignore[attr-defined]
         await session.commit()
         await _enqueue_outbound_undo_follow(
             session, enqueuer, source=source, target=target, follow_uri=existing_uri

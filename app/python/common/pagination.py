@@ -43,7 +43,7 @@ def page_params(
     return PageParams(max_id=max_id, since_id=since_id, min_id=min_id, limit=limit)
 
 
-def apply_pagination(stmt: Select, id_column: Any, params: PageParams) -> Select:  # type: ignore[type-arg]
+def apply_pagination(stmt: Select, id_column: Any, params: PageParams) -> Select:
     """Apply id-cursor filters and ordering to a snowflake-keyed query.
 
     Returns rows in descending id order (Mastodon's standard) except when

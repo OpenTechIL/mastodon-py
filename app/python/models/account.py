@@ -73,14 +73,14 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
 
-    user: Mapped[User | None] = relationship(  # type: ignore[name-defined]
+    user: Mapped[User | None] = relationship(
         "User",
         back_populates="account",
         uselist=False,
         lazy="joined",
     )
 
-    stat: Mapped[AccountStat | None] = relationship(  # type: ignore[name-defined]
+    stat: Mapped[AccountStat | None] = relationship(
         "AccountStat",
         primaryjoin="Account.id == AccountStat.account_id",
         uselist=False,

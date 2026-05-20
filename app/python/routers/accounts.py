@@ -237,7 +237,7 @@ def _coerce_bool(v: object) -> bool | None:
     return str(v).lower() in ("true", "1", "yes")
 
 
-async def _save_account_image(account: object, kind: str, file_bytes: bytes, content_type: str, filename: str) -> None:
+async def _save_account_image(account: Account, kind: str, file_bytes: bytes, content_type: str, filename: str) -> None:
     import os as _os
 
     from app.python.storage import get_storage
@@ -252,7 +252,7 @@ async def _save_account_image(account: object, kind: str, file_bytes: bytes, con
     setattr(account, f"{kind}_content_type", content_type or "image/jpeg")
 
 
-async def _apply_credentials_data(account: object, data: dict) -> None:
+async def _apply_credentials_data(account: Account, data: dict) -> None:
     if "display_name" in data and data["display_name"] is not None:
         account.display_name = data["display_name"]
     if "note" in data and data["note"] is not None:
@@ -262,11 +262,11 @@ async def _apply_credentials_data(account: object, data: dict) -> None:
     if "bot" in data and data["bot"] is not None:
         account.actor_type = "Service" if _coerce_bool(data["bot"]) else "Person"
     if "discoverable" in data and data["discoverable"] is not None:
-        account.discoverable = _coerce_bool(data["discoverable"])
+        account.discoverable = bool(_coerce_bool(data["discoverable"]))
     if "indexable" in data and data["indexable"] is not None:
-        account.indexable = _coerce_bool(data["indexable"])
+        account.indexable = bool(_coerce_bool(data["indexable"]))
     if "hide_collections" in data and data["hide_collections"] is not None:
-        account.hide_collections = _coerce_bool(data["hide_collections"])
+        account.hide_collections = bool(_coerce_bool(data["hide_collections"]))
     if "fields_attributes" in data and data["fields_attributes"] is not None:
         raw = data["fields_attributes"]
         if isinstance(raw, list):

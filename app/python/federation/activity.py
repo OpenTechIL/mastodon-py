@@ -593,7 +593,7 @@ async def _handle_undo_like(
             Favourite.status_id == target.id,
         )
     )
-    if result.rowcount:
+    if result.rowcount:  # type: ignore[attr-defined]
         await adjust_counter(
             session,
             table="status_stats",

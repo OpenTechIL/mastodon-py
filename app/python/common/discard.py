@@ -33,11 +33,11 @@ class Discardable:
         return cls.deleted_at.is_not(None)
 
     @classmethod
-    def kept(cls, stmt: Select) -> Select:  # type: ignore[type-arg]
+    def kept(cls, stmt: Select) -> Select:
         return stmt.where(cls.kept_clause())
 
     @classmethod
-    def discarded(cls, stmt: Select) -> Select:  # type: ignore[type-arg]
+    def filter_discarded(cls, stmt: Select) -> Select:
         return stmt.where(cls.discarded_clause())
 
     @property

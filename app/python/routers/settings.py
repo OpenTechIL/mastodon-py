@@ -471,14 +471,14 @@ async def filter_create(request: Request):
     now = datetime.now(tz=UTC).replace(tzinfo=None)
 
     phrase = str(form.get("phrase", "")).strip()
-    action = int(form.get("action", "0"))
+    action = int(str(form.get("action", "0")))
     context = [c for c in ["home", "notifications", "public", "thread", "account"]
                if form.get(f"context_{c}")]
     expires_in = form.get("expires_in", "")
     expires_at = None
     if expires_in:
         from datetime import timedelta
-        expires_at = now + timedelta(seconds=int(expires_in))
+        expires_at = now + timedelta(seconds=int(str(expires_in)))
 
     keywords_raw = form.getlist("keyword")
     whole_words_raw = set(form.getlist("whole_word_idx"))
@@ -496,7 +496,7 @@ async def filter_create(request: Request):
         db.add(f)
         await db.flush()
         for idx, kw_text in enumerate(keywords_raw):
-            kw_text = kw_text.strip()
+            kw_text = str(kw_text).strip()
             if not kw_text:
                 continue
             db.add(CustomFilterKeyword(
@@ -566,13 +566,13 @@ async def filter_update_or_delete(request: Request, filter_id: int):
         # Update
         now = datetime.now(tz=UTC).replace(tzinfo=None)
         f.phrase = str(form.get("phrase", "")).strip()
-        f.action = int(form.get("action", "0"))
+        f.action = int(str(form.get("action", "0")))
         f.context = [c for c in ["home", "notifications", "public", "thread", "account"]
                      if form.get(f"context_{c}")]
         expires_in = form.get("expires_in", "")
         if expires_in:
             from datetime import timedelta
-            f.expires_at = now + timedelta(seconds=int(expires_in))
+            f.expires_at = now + timedelta(seconds=int(str(expires_in)))
         else:
             f.expires_at = None
         f.updated_at = now
@@ -589,7 +589,7 @@ async def filter_update_or_delete(request: Request, filter_id: int):
         keywords_raw = form.getlist("keyword")
         whole_words_raw = set(form.getlist("whole_word_idx"))
         for idx, kw_text in enumerate(keywords_raw):
-            kw_text = kw_text.strip()
+            kw_text = str(kw_text).strip()
             if not kw_text:
                 continue
             db.add(CustomFilterKeyword(
@@ -606,7 +606,7 @@ async def filter_update_or_delete(request: Request, filter_id: int):
 
 def _filter_form(f: CustomFilter | None, kws: list[CustomFilterKeyword]) -> str:
     is_edit = f is not None
-    action_url = f"/filters/{f.id}" if is_edit else "/filters"
+    action_url = f"/filters/{f.id}" if f is not None else "/filters"
     title = "Edit filter" if is_edit else "New filter"
     phrase = f.phrase if f else ""
     sel_action = f.action if f else 0
@@ -796,13 +796,13 @@ async def statuses_cleanup_post(request: Request):
     now = datetime.now(tz=UTC).replace(tzinfo=None)
 
     enabled = form.get("enabled") == "1"
-    min_age = int(form.get("min_status_age", "1209600"))
+    min_age = int(str(form.get("min_status_age", "1209600")))
 
     def get_bool(name: str, default: bool) -> bool:
         return form.get(name) == "1" if enabled else default
 
     def get_int_or_none(name: str) -> int | None:
-        v = form.get(name, "").strip()
+        v = str(form.get(name, "")).strip()
         return int(v) if v.isdigit() and int(v) >= 1 else None
 
     async with session_factory()() as db:

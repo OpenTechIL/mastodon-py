@@ -107,7 +107,7 @@ async def unpin(
             StatusPin.status_id == status.id,
         )
     )
-    if not result.rowcount:
+    if not result.rowcount:  # type: ignore[attr-defined]
         return False
     await session.commit()
     return True

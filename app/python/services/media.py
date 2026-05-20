@@ -224,7 +224,7 @@ def _process_audio(
         src_path.unlink(missing_ok=True)
 
     if waveform_bytes is None:
-        return data, meta, None, None, None
+        return data, meta, None, None, None  # type: ignore[return-value]
     try:
         from PIL import Image
 
@@ -236,8 +236,8 @@ def _process_audio(
                 "aspect": wf.width / wf.height if wf.height else 0.0,
             }
     except Exception:
-        return data, meta, None, None, None
-    return data, meta, None, waveform_bytes, small_dims
+        return data, meta, None, None, None  # type: ignore[return-value]
+    return data, meta, None, waveform_bytes, small_dims  # type: ignore[return-value]
 
 
 def _ffprobe_metadata(path: Path) -> dict[str, object] | None:
@@ -502,7 +502,7 @@ def _process_image(
             save_kwargs["progressive"] = True
         if img.format == "PNG":
             save_kwargs["optimize"] = True
-        img.save(clean_buf, **save_kwargs)
+        img.save(clean_buf, **save_kwargs)  # type: ignore[arg-type]
         data = clean_buf.getvalue()
     elif img.format == "GIF" and is_animated:
         cleaned = _reencode_animated_gif(img)
@@ -546,7 +546,7 @@ def _process_image(
     small_fmt = "JPEG" if small.mode == "RGB" else "PNG"
     small.save(small_buf, format=small_fmt, quality=85)
     small_bytes = small_buf.getvalue()
-    small_dims = {"width": small.width, "height": small.height, "size": f"{small.width}x{small.height}", "aspect": small.width / small.height if small.height else 0.0}  # type: ignore[dict-item]
+    small_dims = {"width": small.width, "height": small.height, "size": f"{small.width}x{small.height}", "aspect": small.width / small.height if small.height else 0.0}
 
     # Blurhash from a downsampled grid. `blurhash-python` calls Pillow's
     # `Image.getdata()` internally, which is deprecated; suppress that one
@@ -564,7 +564,7 @@ def _process_image(
         )
         hash_str = blurhash.encode(blur_src, x_components=4, y_components=4)
 
-    return data, original_dims, hash_str, small_bytes, small_dims
+    return data, original_dims, hash_str, small_bytes, small_dims  # type: ignore[return-value]
 
 
 async def upload_media(
@@ -600,13 +600,13 @@ async def upload_media(
                 "Video could not be decoded (ffmpeg/ffprobe missing or unsupported codec)"
             )
     elif media_type is MediaType.AUDIO:
-        processed = await asyncio.to_thread(_process_audio, data)
+        processed = await asyncio.to_thread(_process_audio, data)  # type: ignore[arg-type]
         if processed is None:
             raise MediaValidationError(
                 "Audio could not be decoded (ffprobe missing or unsupported codec)"
             )
     else:
-        processed = await asyncio.to_thread(_process_image, data, target_format="PNG")
+        processed = await asyncio.to_thread(_process_image, data, target_format="PNG")  # type: ignore[arg-type]
         if processed is None:
             raise MediaValidationError("File does not appear to be a valid image")
     original_bytes, original_dims, blurhash_str, small_bytes, small_dims = processed

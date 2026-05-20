@@ -48,7 +48,7 @@ async def _tear_down_follow(
             Follow.target_account_id == target_id,
         )
     )
-    if result.rowcount:
+    if result.rowcount:  # type: ignore[attr-defined]
         await adjust_counter(
             session,
             table="account_stats",
@@ -131,7 +131,7 @@ async def unblock(
             Block.target_account_id == target.id,
         )
     )
-    if not result.rowcount:
+    if not result.rowcount:  # type: ignore[attr-defined]
         return False
     await session.commit()
     return True

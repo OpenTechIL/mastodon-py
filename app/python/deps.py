@@ -102,7 +102,7 @@ async def get_current_application(auth: CurrentAuth) -> OAuthApplication:
 CurrentApplication = Annotated[OAuthApplication, Depends(get_current_application)]
 
 
-def require_scope(scope: str):  # type: ignore[no-untyped-def]
+def require_scope(scope: str):
     """Build a Depends that requires the access token to hold `scope`.
 
     Usage:

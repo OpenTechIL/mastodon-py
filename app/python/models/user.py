@@ -79,7 +79,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
 
-    account: Mapped[Account] = relationship(  # type: ignore[name-defined]
+    account: Mapped[Account] = relationship(
         "Account",
         back_populates="user",
         uselist=False,

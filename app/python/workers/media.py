@@ -85,9 +85,9 @@ async def _run(
     if media_type is MediaType.VIDEO:
         processed = await asyncio.to_thread(_process_video, data)
     elif media_type is MediaType.AUDIO:
-        processed = await asyncio.to_thread(_process_audio, data)
+        processed = await asyncio.to_thread(_process_audio, data)  # type: ignore[arg-type]
     else:
-        processed = await asyncio.to_thread(_process_image, data, target_format="PNG")
+        processed = await asyncio.to_thread(_process_image, data, target_format="PNG")  # type: ignore[arg-type]
 
     if processed is None:
         row.processing = MediaProcessing.FAILED.value

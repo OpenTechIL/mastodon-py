@@ -441,8 +441,8 @@ async def index_v1(session: DBSession, viewer: CurrentAccount) -> list[_FilterV1
             phrase=phrase,
             context=f.context or [],
             expires_at=f.expires_at,
-            filter_action=f.action or "warn",
-            irreversible=f.action == "hide",
+            filter_action=str(f.action or "warn"),
+            irreversible=str(f.action) == "hide",
             whole_word=whole_word,
         ))
     return result

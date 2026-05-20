@@ -80,7 +80,7 @@ async def favourites_listing(
         Favourite.id,
         params,
     )
-    cursors = _to_cursors((await session.execute(stmt)).all())
+    cursors = _to_cursors((await session.execute(stmt)).all())  # type: ignore[arg-type]
     ordered = maybe_reverse(cursors, params)
     if not ordered:
         return []
@@ -125,7 +125,7 @@ async def bookmarks_listing(
         Bookmark.id,
         params,
     )
-    cursors = _to_cursors((await session.execute(stmt)).all())
+    cursors = _to_cursors((await session.execute(stmt)).all())  # type: ignore[arg-type]
     ordered = maybe_reverse(cursors, params)
     if not ordered:
         return []

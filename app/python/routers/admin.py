@@ -121,7 +121,7 @@ async def _dim_space_usage(session: AsyncSession) -> dict:
         s = get_settings()
         r = redis_lib.Redis(host=s.redis_host, port=s.redis_port, socket_connect_timeout=1)
         info = r.info("memory")
-        redis_size = info.get("used_memory", 0)
+        redis_size = info.get("used_memory", 0)  # type: ignore[union-attr]
         r.close()
     except Exception:
         redis_size = 0
@@ -157,7 +157,7 @@ async def _dim_software_versions(session: AsyncSession) -> dict:
         import redis as redis_lib
         s = get_settings()
         r = redis_lib.Redis(host=s.redis_host, port=s.redis_port, socket_connect_timeout=1)
-        redis_ver = r.info("server").get("redis_version", "unknown")
+        redis_ver = r.info("server").get("redis_version", "unknown")  # type: ignore[union-attr]
         r.close()
     except Exception:
         redis_ver = "unknown"
@@ -209,9 +209,9 @@ async def dimensions(
             continue
         try:
             if key in ("space_usage", "software_versions"):
-                result.append(await handler(session))
+                result.append(await handler(session))  # type: ignore[operator]
             else:
-                result.append(await handler(session, start_at, end_at, limit))
+                result.append(await handler(session, start_at, end_at, limit))  # type: ignore[operator]
         except Exception:
             result.append({"key": key, "data": []})
     return result

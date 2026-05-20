@@ -74,7 +74,7 @@ async def search(
 
     out = SearchResults()
     needle = f"%{q.lstrip('@#').strip()}%"
-    viewer_account_id = auth.account.id if is_authed else None
+    viewer_account_id = auth.account.id if auth and auth.account else None
 
     if type in (None, "accounts"):
         out.accounts = await _search_accounts(

@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url(self) -> PostgresDsn:
-        return PostgresDsn.build(  # type: ignore[return-value]
+        return PostgresDsn.build(
             scheme="postgresql+asyncpg",
             username=self.db_user,
             password=self.db_pass or None,
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     def redis_dsn(self) -> RedisDsn:
         if self.redis_url:
             return RedisDsn(self.redis_url)
-        return RedisDsn.build(  # type: ignore[return-value]
+        return RedisDsn.build(
             scheme="redis",
             password=self.redis_password,
             host=self.redis_host,

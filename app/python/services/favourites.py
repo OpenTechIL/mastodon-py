@@ -125,7 +125,7 @@ async def unfavourite(
             Favourite.status_id == status.id,
         )
     )
-    if result.rowcount == 0:
+    if result.rowcount == 0:  # type: ignore[attr-defined]
         return False
     await adjust_counter(
         session,

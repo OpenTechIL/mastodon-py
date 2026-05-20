@@ -38,7 +38,7 @@ async def get_web_settings(
     row = (
         await session.execute(select(WebSetting).where(WebSetting.user_id == user.id))
     ).scalar_one_or_none()
-    return row.data if row else {}
+    return dict(row.data) if row and row.data else {}
 
 
 @router.put("/settings", status_code=status.HTTP_204_NO_CONTENT)

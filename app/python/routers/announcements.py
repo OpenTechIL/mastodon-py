@@ -60,15 +60,19 @@ async def index(
     """
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     rows = (
-        await session.execute(
-            select(Announcement)
-            .where(
-                Announcement.published.is_(True),
-                (Announcement.ends_at.is_(None)) | (Announcement.ends_at > now),
+        (
+            await session.execute(
+                select(Announcement)
+                .where(
+                    Announcement.published.is_(True),
+                    (Announcement.ends_at.is_(None)) | (Announcement.ends_at > now),
+                )
+                .order_by(Announcement.published_at.desc().nulls_last())
             )
-            .order_by(Announcement.published_at.desc().nulls_last())
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if not rows:
         return []
 
@@ -76,13 +80,17 @@ async def index(
     read_ids: set[int] = set()
     if viewer_account_id is not None:
         muted = (
-            await session.execute(
-                select(AnnouncementMute.announcement_id).where(
-                    AnnouncementMute.account_id == viewer_account_id,
-                    AnnouncementMute.announcement_id.in_([a.id for a in rows]),
+            (
+                await session.execute(
+                    select(AnnouncementMute.announcement_id).where(
+                        AnnouncementMute.account_id == viewer_account_id,
+                        AnnouncementMute.announcement_id.in_([a.id for a in rows]),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         read_ids = set(muted)
     return [_serialize(a, read=a.id in read_ids) for a in rows]
 
@@ -95,11 +103,7 @@ async def put_reaction(
     viewer: CurrentAccount,
 ) -> dict[str, Any]:
     """Add an emoji reaction to an announcement. Stub — stores nothing."""
-    row = (
-        await session.execute(
-            select(Announcement).where(Announcement.id == announcement_id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Announcement).where(Announcement.id == announcement_id))).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return {}
@@ -113,11 +117,7 @@ async def delete_reaction(
     viewer: CurrentAccount,
 ) -> dict[str, Any]:
     """Remove an emoji reaction from an announcement. Stub."""
-    row = (
-        await session.execute(
-            select(Announcement).where(Announcement.id == announcement_id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Announcement).where(Announcement.id == announcement_id))).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return {}
@@ -129,11 +129,7 @@ async def dismiss(
     session: DBSession,
     viewer: CurrentAccount,
 ) -> dict[str, Any]:
-    row = (
-        await session.execute(
-            select(Announcement).where(Announcement.id == announcement_id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Announcement).where(Announcement.id == announcement_id))).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
 

@@ -42,9 +42,7 @@ def _serialize(att: MediaAttachment) -> MediaAttachment_:
     )
 
 
-@router.post(
-    "/api/v1/media", response_model=MediaAttachment_, status_code=status.HTTP_200_OK
-)
+@router.post("/api/v1/media", response_model=MediaAttachment_, status_code=status.HTTP_200_OK)
 async def upload_v1(
     session: DBSession,
     account: CurrentAccount,
@@ -63,9 +61,7 @@ async def upload_v1(
             description=description,
         )
     except media_service.MediaValidationError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.detail
-        ) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.detail) from exc
     return _serialize(att)
 
 
@@ -96,9 +92,7 @@ async def upload_v2(
             enqueuer=enqueuer,
         )
     except media_service.MediaValidationError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.detail
-        ) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.detail) from exc
     return _serialize(att)
 
 
@@ -109,11 +103,7 @@ async def show(
     session: DBSession,
     account: CurrentAccount,
 ) -> MediaAttachment_:
-    row = (
-        await session.execute(
-            select(MediaAttachment).where(MediaAttachment.id == media_id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(MediaAttachment).where(MediaAttachment.id == media_id))).scalar_one_or_none()
     if row is None or row.account_id != account.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return _serialize(row)
@@ -132,11 +122,7 @@ async def update(
     session: DBSession,
     account: CurrentAccount,
 ) -> MediaAttachment_:
-    row = (
-        await session.execute(
-            select(MediaAttachment).where(MediaAttachment.id == media_id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(MediaAttachment).where(MediaAttachment.id == media_id))).scalar_one_or_none()
     if row is None or row.account_id != account.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     try:
@@ -147,7 +133,5 @@ async def update(
             description=body.description,
         )
     except media_service.MediaValidationError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.detail
-        ) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=exc.detail) from exc
     return _serialize(row)

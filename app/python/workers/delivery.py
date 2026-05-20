@@ -50,15 +50,9 @@ async def _run(
     inbox_urls: list[str],
 ) -> DeliveryReport:
     """Pure-logic core. Caller owns session + http_client lifecycle."""
-    sender = (
-        await session.execute(
-            select(Account).where(Account.id == sender_account_id)
-        )
-    ).scalar_one_or_none()
+    sender = (await session.execute(select(Account).where(Account.id == sender_account_id))).scalar_one_or_none()
     if sender is None:
-        _log.warning(
-            "deliver_activity: sender account %s not found", sender_account_id
-        )
+        _log.warning("deliver_activity: sender account %s not found", sender_account_id)
         return DeliveryReport(attempts=0, successes=0, failures=0)
     if not sender.private_key:
         _log.warning(

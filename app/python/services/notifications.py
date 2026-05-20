@@ -37,11 +37,7 @@ from app.python.models import (
 
 async def _is_local(session: AsyncSession, account_id: int) -> bool:
     """An account is local when it has a `users` row."""
-    row = (
-        await session.execute(
-            select(User.id).where(User.account_id == account_id).limit(1)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(User.id).where(User.account_id == account_id).limit(1))).scalar_one_or_none()
     return row is not None
 
 

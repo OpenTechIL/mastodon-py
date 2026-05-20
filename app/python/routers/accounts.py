@@ -92,9 +92,7 @@ async def register(
         raise HTTPException(status_code=422, detail={"error": "Username is already taken"})
 
     # Email must be unique
-    existing_user = (
-        await session.execute(select(User).where(User.email == body.email))
-    ).scalar_one_or_none()
+    existing_user = (await session.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if existing_user:
         raise HTTPException(status_code=422, detail={"error": "Email is already in use"})
 
@@ -141,9 +139,7 @@ async def register(
     )
     session.add(stat)
 
-    encrypted_password = bcrypt.hashpw(
-        body.password.encode("utf-8"), bcrypt.gensalt(12)
-    ).decode("utf-8")
+    encrypted_password = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt(12)).decode("utf-8")
 
     user = User(
         id=now_id(),
@@ -198,19 +194,14 @@ async def register(
 
 @router.get("/verify_credentials", response_model=Account_)
 async def verify_credentials(account: CurrentAccount, session: DBSession) -> Account_:
-    user = (
-        await session.execute(select(User).where(User.account_id == account.id))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.account_id == account.id))).scalar_one_or_none()
     acc = serialize_account(account)
     acc.source = {
         "privacy": "public",
         "sensitive": False,
         "language": user.locale if user and user.locale else "en",
         "note": account.note or "",
-        "fields": [
-            {"name": str(f.get("name", "")), "value": str(f.get("value", ""))}
-            for f in (account.fields or [])
-        ],
+        "fields": [{"name": str(f.get("name", "")), "value": str(f.get("value", ""))} for f in (account.fields or [])],
         "follow_requests_count": 0,
         "hide_collections": account.hide_collections,
         "discoverable": account.discoverable,
@@ -241,6 +232,7 @@ async def _save_account_image(account: Account, kind: str, file_bytes: bytes, co
     import os as _os
 
     from app.python.storage import get_storage
+
     ext = _os.path.splitext(filename)[1] or ".jpg"
     fname = f"original{ext}"
     storage_dir = "avatars" if kind == "avatar" else "headers"
@@ -272,7 +264,8 @@ async def _apply_credentials_data(account: Account, data: dict) -> None:
         if isinstance(raw, list):
             cleaned = [
                 {"name": str(f.get("name", "")).strip(), "value": str(f.get("value", "")).strip()}
-                for f in raw if isinstance(f, dict)
+                for f in raw
+                if isinstance(f, dict)
                 if str(f.get("name", "")).strip() or str(f.get("value", "")).strip()
             ][:4]
             account.fields = cleaned
@@ -310,6 +303,7 @@ async def update_credentials(
                     )
     else:
         import json as _json
+
         body = await request.body()
         data = _json.loads(body) if body else {}
         await _apply_credentials_data(account, data)
@@ -352,9 +346,7 @@ async def search(
         .limit(limit)
     )
     if following and auth and auth.account:
-        followee_ids = select(Follow.target_account_id).where(
-            Follow.account_id == auth.account.id
-        )
+        followee_ids = select(Follow.target_account_id).where(Follow.account_id == auth.account.id)
         stmt = stmt.where(Account.id.in_(followee_ids))
     rows = (await session.execute(stmt)).unique().scalars().all()
     return [serialize_account(a) for a in rows]
@@ -417,10 +409,8 @@ async def familiar_followers(
         return out
 
     viewer_followee_ids = (
-        await session.execute(
-            select(Follow.target_account_id).where(Follow.account_id == viewer.id)
-        )
-    ).scalars().all()
+        (await session.execute(select(Follow.target_account_id).where(Follow.account_id == viewer.id))).scalars().all()
+    )
     viewer_followee_set = set(viewer_followee_ids)
 
     for target_id in id:
@@ -429,20 +419,23 @@ async def familiar_followers(
             continue
         # Accounts in viewer's followee set that also follow the target.
         rows = (
-            await session.execute(
-                select(Account)
-                .join(Follow, Follow.account_id == Account.id)
-                .where(
-                    Follow.target_account_id == target_id,
-                    Account.id.in_(viewer_followee_set),
+            (
+                await session.execute(
+                    select(Account)
+                    .join(Follow, Follow.account_id == Account.id)
+                    .where(
+                        Follow.target_account_id == target_id,
+                        Account.id.in_(viewer_followee_set),
+                    )
+                    .order_by(Follow.id.desc())
+                    .limit(4)
                 )
-                .order_by(Follow.id.desc())
-                .limit(4)
             )
-        ).unique().scalars().all()
-        out.append(
-            {"id": str(target_id), "accounts": [serialize_account(a) for a in rows]}
+            .unique()
+            .scalars()
+            .all()
         )
+        out.append({"id": str(target_id), "accounts": [serialize_account(a) for a in rows]})
     return out
 
 
@@ -453,9 +446,7 @@ class _AccountNoteBody(BaseModel):
 
 
 async def _load_target(session, account_id: int) -> Account:
-    row = (
-        await session.execute(select(Account).where(Account.id == account_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Account).where(Account.id == account_id))).scalar_one_or_none()
     if row is None or row.suspended:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return row
@@ -475,17 +466,11 @@ async def follow(
 ) -> Relationship:
     target = await _load_target(session, account_id)
     try:
-        await follow_service.follow(
-            session, source=viewer, target=target, enqueuer=enqueuer
-        )
+        await follow_service.follow(session, source=viewer, target=target, enqueuer=enqueuer)
     except follow_service.SelfFollow as exc:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        ) from exc
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     except follow_service.BlockedFollow as exc:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, detail="This action is not allowed"
-        ) from exc
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="This action is not allowed") from exc
     rels = await load_account_relationships(session, viewer.id, [account_id])
     return serialize_relationship(account_id, rels)
 
@@ -507,9 +492,7 @@ async def block(
     try:
         await block_service.block(session, source=viewer, target=target)
     except block_service.SelfBlock as exc:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        ) from exc
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     rels = await load_account_relationships(session, viewer.id, [account_id])
     return serialize_relationship(account_id, rels)
 
@@ -544,9 +527,7 @@ async def mute(
             duration_seconds=duration or None,
         )
     except mute_service.SelfMute as exc:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        ) from exc
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     rels = await load_account_relationships(session, viewer.id, [account_id])
     return serialize_relationship(account_id, rels)
 
@@ -693,9 +674,7 @@ async def unfollow(
     enqueuer: Enqueuer = Depends(get_enqueuer),
 ) -> Relationship:
     target = await _load_target(session, account_id)
-    await follow_service.unfollow(
-        session, source=viewer, target=target, enqueuer=enqueuer
-    )
+    await follow_service.unfollow(session, source=viewer, target=target, enqueuer=enqueuer)
     rels = await load_account_relationships(session, viewer.id, [account_id])
     return serialize_relationship(account_id, rels)
 
@@ -709,16 +688,12 @@ async def remove_from_followers(
 ) -> Relationship:
     """Remove the given account from the viewer's followers list."""
     follower = await _load_target(session, account_id)
-    await follow_service.unfollow(
-        session, source=follower, target=viewer, enqueuer=enqueuer
-    )
+    await follow_service.unfollow(session, source=follower, target=viewer, enqueuer=enqueuer)
     rels = await load_account_relationships(session, viewer.id, [account_id])
     return serialize_relationship(account_id, rels)
 
 
-async def _allowed_visibilities(
-    session, viewer_account_id: int | None, target_account_id: int
-) -> set[int]:
+async def _allowed_visibilities(session, viewer_account_id: int | None, target_account_id: int) -> set[int]:
     """Compute the set of visibility values the viewer is permitted to see.
 
     DIRECT is intentionally excluded even when the viewer is the author —
@@ -769,9 +744,7 @@ async def account_statuses(
             .limit(params.limit)
         )
         pinned_rows = (await session.execute(pin_stmt)).unique().scalars().all()
-        relationships = await load_relationships(
-            session, viewer_account_id, status_ids_for_batch(pinned_rows)
-        )
+        relationships = await load_relationships(session, viewer_account_id, status_ids_for_batch(pinned_rows))
         return [serialize_status(row, relationships=relationships) for row in pinned_rows]
 
     stmt = select(Status).where(
@@ -797,16 +770,12 @@ async def account_statuses(
         str(request.url.include_query_params().replace(query="")),
         ordered,
         params,
-        extra_query=_statuses_link_extras(
-            exclude_replies=exclude_replies, exclude_reblogs=exclude_reblogs
-        ),
+        extra_query=_statuses_link_extras(exclude_replies=exclude_replies, exclude_reblogs=exclude_reblogs),
     )
     if link:
         response.headers["Link"] = link
 
-    relationships = await load_relationships(
-        session, viewer_account_id, status_ids_for_batch(ordered)
-    )
+    relationships = await load_relationships(session, viewer_account_id, status_ids_for_batch(ordered))
     return [serialize_status(row, relationships=relationships) for row in ordered]
 
 
@@ -834,10 +803,7 @@ async def _follow_page(
     Cursor is on Follow.id (Mastodon's contract — most recent follow first);
     response body is the related Account.
     """
-    if (
-        target.hide_collections
-        and not (auth and auth.account and auth.account.id == target.id)
-    ):
+    if target.hide_collections and not (auth and auth.account and auth.account.id == target.id):
         return []
 
     if role == "followers":
@@ -847,28 +813,19 @@ async def _follow_page(
         follow_filter = Follow.account_id == target.id
         account_filter_id = Follow.target_account_id
 
-    stmt = (
-        select(Follow.id, account_filter_id)
-        .where(follow_filter)
-    )
+    stmt = select(Follow.id, account_filter_id).where(follow_filter)
     stmt = apply_pagination(stmt, Follow.id, params)
     pairs = (await session.execute(stmt)).all()
-    ordered_pairs = maybe_reverse(
-        [_FollowCursor(follow_id=row[0], account_id=row[1]) for row in pairs], params
-    )
+    ordered_pairs = maybe_reverse([_FollowCursor(follow_id=row[0], account_id=row[1]) for row in pairs], params)
     if not ordered_pairs:
         return []
 
     account_ids = [p.account_id for p in ordered_pairs]
-    rows = (
-        await session.execute(select(Account).where(Account.id.in_(account_ids)))
-    ).unique().scalars().all()
+    rows = (await session.execute(select(Account).where(Account.id.in_(account_ids)))).unique().scalars().all()
     by_id = {row.id: row for row in rows}
 
     accounts = [
-        by_id[p.account_id]
-        for p in ordered_pairs
-        if p.account_id in by_id and not by_id[p.account_id].suspended
+        by_id[p.account_id] for p in ordered_pairs if p.account_id in by_id and not by_id[p.account_id].suspended
     ]
 
     link = build_link_header(

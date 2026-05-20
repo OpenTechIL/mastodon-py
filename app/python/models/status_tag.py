@@ -15,9 +15,5 @@ class StatusTag(Base):
     # SQLAlchemy's declarative mapper just needs a `primary_key=True` on each
     # member of the key — the actual column order in the constraint matches
     # the schema by virtue of the column declaration order below.
-    tag_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("tags.id"), primary_key=True
-    )
-    status_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("statuses.id"), primary_key=True
-    )
+    tag_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tags.id"), primary_key=True)
+    status_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("statuses.id"), primary_key=True)

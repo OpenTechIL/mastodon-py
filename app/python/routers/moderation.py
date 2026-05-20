@@ -16,7 +16,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from app.python.common.pagination import (
     PageParams,
@@ -27,8 +27,6 @@ from app.python.common.pagination import (
 )
 from app.python.common.snowflake import now_id
 from app.python.deps import CurrentAccount, DBSession
-from sqlalchemy import func
-
 from app.python.models import (
     Account,
     AccountDomainBlock,
@@ -91,21 +89,15 @@ async def create_report(
     viewer: CurrentAccount,
 ) -> Report_:
     if body.account_id == viewer.id:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="You can't report yourself"
-        )
-    target = (
-        await session.execute(select(Account).where(Account.id == body.account_id))
-    ).scalar_one_or_none()
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="You can't report yourself")
+    target = (await session.execute(select(Account).where(Account.id == body.account_id))).scalar_one_or_none()
     if target is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
 
     try:
         category = parse_report_category(body.category)
     except ValueError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = Report(
@@ -149,7 +141,9 @@ async def domain_block_preview(
     )
     followers_count = (
         await session.execute(
-            select(func.count()).select_from(Follow).where(
+            select(func.count())
+            .select_from(Follow)
+            .where(
                 Follow.target_account_id == viewer.id,
                 Follow.account_id.in_(remote_accts),
             )
@@ -157,7 +151,9 @@ async def domain_block_preview(
     ).scalar() or 0
     following_count = (
         await session.execute(
-            select(func.count()).select_from(Follow).where(
+            select(func.count())
+            .select_from(Follow)
+            .where(
                 Follow.account_id == viewer.id,
                 Follow.target_account_id.in_(remote_accts),
             )
@@ -175,9 +171,7 @@ async def domain_blocks_index(
     params: Annotated[PageParams, Depends(page_params)],
 ) -> list[str]:
     stmt = apply_pagination(
-        select(AccountDomainBlock.id, AccountDomainBlock.domain).where(
-            AccountDomainBlock.account_id == viewer.id
-        ),
+        select(AccountDomainBlock.id, AccountDomainBlock.domain).where(AccountDomainBlock.account_id == viewer.id),
         AccountDomainBlock.id,
         params,
     )
@@ -220,9 +214,7 @@ async def domain_block_add(
     a form body field. The React composer uses query params."""
     name = domain.strip().lower()
     if not name:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="domain can't be blank"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="domain can't be blank")
 
     existing = (
         await session.execute(
@@ -256,9 +248,7 @@ async def domain_block_remove(
 ) -> dict[str, Any]:
     name = domain.strip().lower()
     if not name:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="domain can't be blank"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="domain can't be blank")
     await session.execute(
         delete(AccountDomainBlock).where(
             AccountDomainBlock.account_id == viewer.id,
@@ -296,6 +286,7 @@ async def dismiss_suggestion_v2(account_id: int) -> dict:
 
 # ---------- /api/v1/emails ----------
 
+
 @router.get("/api/v1/emails/check_confirmation", response_model=dict)
 async def check_email_confirmation() -> dict:
     """Stub — email confirmation flow not yet ported."""
@@ -308,6 +299,7 @@ async def request_email_confirmation() -> dict:
 
 
 # ---------- /api/v1/donation_campaigns ----------
+
 
 @router.get("/api/v1/donation_campaigns", response_model=list)
 async def donation_campaigns() -> list:

@@ -56,30 +56,20 @@ async def webfinger(
 ) -> Response:
     parsed = _parse_acct(resource)
     if parsed is None:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail="Invalid resource"
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid resource")
     username, host = parsed
 
     settings = get_settings()
     expected_host = settings.local_domain
     expected_web = settings.effective_web_domain
     if host not in {expected_host, expected_web}:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
 
     row = (
-        await session.execute(
-            select(Account).where(
-                Account.username == username, Account.domain.is_(None)
-            )
-        )
+        await session.execute(select(Account).where(Account.username == username, Account.domain.is_(None)))
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
 
     asset_host = _asset_host()
     actor_url = f"{asset_host}/users/{row.username}"
@@ -110,6 +100,7 @@ async def webfinger(
 
 # ── NodeInfo ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/.well-known/nodeinfo")
 async def nodeinfo_discovery() -> Response:
     """NodeInfo discovery document — points to the 2.0 schema endpoint."""
@@ -125,7 +116,7 @@ async def nodeinfo_discovery() -> Response:
     }
     return Response(
         content=json.dumps(body),
-        media_type="application/json; profile=\"http://nodeinfo.diaspora.software/ns/schema/2.0#\"",
+        media_type='application/json; profile="http://nodeinfo.diaspora.software/ns/schema/2.0#"',
     )
 
 
@@ -133,13 +124,10 @@ async def nodeinfo_discovery() -> Response:
 async def nodeinfo_schema(session: DBSession) -> Response:
     """NodeInfo 2.0 — server software, usage stats, and capabilities."""
     settings = get_settings()
-    user_count = (
-        await session.execute(select(func.count()).select_from(User))
-    ).scalar_one()
+    user_count = (await session.execute(select(func.count()).select_from(User))).scalar_one()
     status_count = (
         await session.execute(
-            select(func.count()).select_from(Status)
-            .where(Status.deleted_at.is_(None), Status.local.is_(True))
+            select(func.count()).select_from(Status).where(Status.deleted_at.is_(None), Status.local.is_(True))
         )
     ).scalar_one()
     body = {
@@ -163,7 +151,7 @@ async def nodeinfo_schema(session: DBSession) -> Response:
     }
     return Response(
         content=json.dumps(body),
-        media_type="application/json; profile=\"http://nodeinfo.diaspora.software/ns/schema/2.0#\"",
+        media_type='application/json; profile="http://nodeinfo.diaspora.software/ns/schema/2.0#"',
     )
 
 
@@ -181,14 +169,19 @@ async def web_manifest() -> Response:
 
     icons = []
     for size in _ANDROID_ICON_SIZES:
-        src = f"{host}/icon-{size}.png" if os.path.isfile(f"public/icon-{size}.png") else \
-              f"{host}/packs-dev/icons/android-chrome-{size}x{size}.png"
-        icons.append({
-            "src": src,
-            "sizes": f"{size}x{size}",
-            "type": "image/png",
-            "purpose": "any maskable",
-        })
+        src = (
+            f"{host}/icon-{size}.png"
+            if os.path.isfile(f"public/icon-{size}.png")
+            else f"{host}/packs-dev/icons/android-chrome-{size}x{size}.png"
+        )
+        icons.append(
+            {
+                "src": src,
+                "sizes": f"{size}x{size}",
+                "type": "image/png",
+                "purpose": "any maskable",
+            }
+        )
 
     body = {
         "id": "/home",
@@ -220,6 +213,7 @@ async def web_manifest() -> Response:
 
 
 # ── oauth-authorization-server ────────────────────────────────────────────────
+
 
 @router.get("/.well-known/oauth-authorization-server")
 async def oauth_authorization_server() -> Response:

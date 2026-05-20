@@ -49,9 +49,7 @@ class BlockedFollow(Exception):
     """Raised when a follow is refused because of a Block in either direction."""
 
 
-async def _blocked_either_way(
-    session: AsyncSession, a: int, b: int
-) -> bool:
+async def _blocked_either_way(session: AsyncSession, a: int, b: int) -> bool:
     row = (
         await session.execute(
             select(Block.id)
@@ -67,9 +65,7 @@ async def _blocked_either_way(
     return row is not None
 
 
-async def _existing_follow(
-    session: AsyncSession, source: Account, target: Account
-) -> Follow | None:
+async def _existing_follow(session: AsyncSession, source: Account, target: Account) -> Follow | None:
     return (
         await session.execute(
             select(Follow).where(
@@ -80,9 +76,7 @@ async def _existing_follow(
     ).scalar_one_or_none()
 
 
-async def _existing_request(
-    session: AsyncSession, source: Account, target: Account
-) -> FollowRequest | None:
+async def _existing_request(session: AsyncSession, source: Account, target: Account) -> FollowRequest | None:
     return (
         await session.execute(
             select(FollowRequest).where(
@@ -114,9 +108,7 @@ async def follow(
 
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     follow_id = now_id()
-    follow_uri = (
-        f"{account_uri(source)}#follows/{follow_id}" if source.local else None
-    )
+    follow_uri = f"{account_uri(source)}#follows/{follow_id}" if source.local else None
     if target.locked:
         req = FollowRequest(
             id=follow_id,
@@ -139,9 +131,7 @@ async def follow(
             type=NotificationType.FOLLOW_REQUEST,
         )
         await session.commit()
-        await _enqueue_outbound_follow(
-            session, enqueuer, source=source, target=target, follow_uri=follow_uri
-        )
+        await _enqueue_outbound_follow(session, enqueuer, source=source, target=target, follow_uri=follow_uri)
         return req
 
     follow_row = Follow(
@@ -180,9 +170,7 @@ async def follow(
         type=NotificationType.FOLLOW,
     )
     await session.commit()
-    await _enqueue_outbound_follow(
-        session, enqueuer, source=source, target=target, follow_uri=follow_uri
-    )
+    await _enqueue_outbound_follow(session, enqueuer, source=source, target=target, follow_uri=follow_uri)
     return follow_row
 
 
@@ -240,9 +228,7 @@ async def authorize_follow_request(
     if req is None:
         return None
 
-    await session.execute(
-        delete(FollowRequest).where(FollowRequest.id == req.id)
-    )
+    await session.execute(delete(FollowRequest).where(FollowRequest.id == req.id))
 
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     follow_row = Follow(
@@ -361,9 +347,7 @@ async def unfollow(
             delta=-1,
         )
         await session.commit()
-        await _enqueue_outbound_undo_follow(
-            session, enqueuer, source=source, target=target, follow_uri=existing_uri
-        )
+        await _enqueue_outbound_undo_follow(session, enqueuer, source=source, target=target, follow_uri=existing_uri)
         return True
 
     request_result = await session.execute(
@@ -374,9 +358,7 @@ async def unfollow(
     )
     if request_result.rowcount:  # type: ignore[attr-defined]
         await session.commit()
-        await _enqueue_outbound_undo_follow(
-            session, enqueuer, source=source, target=target, follow_uri=existing_uri
-        )
+        await _enqueue_outbound_undo_follow(session, enqueuer, source=source, target=target, follow_uri=existing_uri)
         return True
     return False
 

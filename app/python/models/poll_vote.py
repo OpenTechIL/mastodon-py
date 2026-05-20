@@ -20,12 +20,8 @@ class PollVote(Base):
     __tablename__ = "poll_votes"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
-    poll_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("polls.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
+    poll_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("polls.id"), nullable=False)
     choice: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     uri: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)

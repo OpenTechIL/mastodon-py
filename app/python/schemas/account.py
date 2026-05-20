@@ -87,8 +87,7 @@ def serialize_account(account: Account) -> Account_:
         statuses_count=stat.statuses_count if stat else 0,
         last_status_at=stat.last_status_at if stat else None,
         fields=[
-            AccountField(name=str(f.get("name", "")), value=str(f.get("value", "")))
-            for f in (account.fields or [])
+            AccountField(name=str(f.get("name", "")), value=str(f.get("value", ""))) for f in (account.fields or [])
         ],
         emojis=[],
     )

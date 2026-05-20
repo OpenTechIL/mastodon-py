@@ -24,11 +24,7 @@ def status_content_format(text: str) -> str:
         return ""
     escaped = html.escape(text, quote=False)
     paragraphs = _PARAGRAPH_BREAK.split(escaped)
-    rendered = [
-        f"<p>{_SINGLE_NEWLINE.sub('<br>', para).strip()}</p>"
-        for para in paragraphs
-        if para.strip()
-    ]
+    rendered = [f"<p>{_SINGLE_NEWLINE.sub('<br>', para).strip()}</p>" for para in paragraphs if para.strip()]
     return "".join(rendered)
 
 

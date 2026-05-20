@@ -41,10 +41,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-_ACTOR_ACCEPT = (
-    "application/activity+json,"
-    'application/ld+json;profile="https://www.w3.org/ns/activitystreams"'
-)
+_ACTOR_ACCEPT = 'application/activity+json,application/ld+json;profile="https://www.w3.org/ns/activitystreams"'
 
 
 async def fetch_and_persist_actor(
@@ -57,9 +54,7 @@ async def fetch_and_persist_actor(
     if not actor_url:
         return None
 
-    existing = (
-        await session.execute(select(Account).where(Account.uri == actor_url))
-    ).scalar_one_or_none()
+    existing = (await session.execute(select(Account).where(Account.uri == actor_url))).scalar_one_or_none()
     if existing is not None:
         return existing
 
@@ -68,9 +63,7 @@ async def fetch_and_persist_actor(
         return None
 
     try:
-        response = await http_client.get(
-            actor_url, headers={"Accept": _ACTOR_ACCEPT}
-        )
+        response = await http_client.get(actor_url, headers={"Accept": _ACTOR_ACCEPT})
     except Exception:
         return None
     if response.status_code != 200:
@@ -99,9 +92,7 @@ async def fetch_and_persist_actor(
 
     # Re-check under "real" SQL — another worker may have inserted
     # this actor between our select and now.
-    existing = (
-        await session.execute(select(Account).where(Account.uri == actor_url))
-    ).scalar_one_or_none()
+    existing = (await session.execute(select(Account).where(Account.uri == actor_url))).scalar_one_or_none()
     if existing is not None:
         return existing
 

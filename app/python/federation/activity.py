@@ -123,9 +123,7 @@ async def dispatch(
     # Every other type is a no-op for this slice.
 
 
-async def _resolve_local_target(
-    session: AsyncSession, object_field: Any
-) -> Account | None:
+async def _resolve_local_target(session: AsyncSession, object_field: Any) -> Account | None:
     """`object` in a Follow is the target actor URL.
 
     Returns the local Account it points at, or None if the URL doesn't
@@ -143,27 +141,17 @@ async def _resolve_local_target(
         return None
     username = parts[1]
     return (
-        await session.execute(
-            select(Account).where(
-                Account.username == username, Account.domain.is_(None)
-            )
-        )
+        await session.execute(select(Account).where(Account.username == username, Account.domain.is_(None)))
     ).scalar_one_or_none()
 
 
-async def _resolve_remote_actor(
-    session: AsyncSession, actor_url: str
-) -> Account | None:
+async def _resolve_remote_actor(session: AsyncSession, actor_url: str) -> Account | None:
     """Look up the verified remote actor by URI.
 
     For this slice we don't auto-create stubs for never-seen actors —
     that's `FetchRemoteAccountService`'s job and lands separately.
     """
-    return (
-        await session.execute(
-            select(Account).where(Account.uri == actor_url)
-        )
-    ).scalar_one_or_none()
+    return (await session.execute(select(Account).where(Account.uri == actor_url))).scalar_one_or_none()
 
 
 async def _handle_follow(
@@ -249,9 +237,7 @@ async def _handle_follow(
     # Only on first-creation: redeliveries of the same Follow shouldn't
     # spam Accepts.
     if is_new and enqueuer is not None:
-        await _send_accept_for_follow(
-            session, enqueuer, target=target, follower=follower, follow=activity
-        )
+        await _send_accept_for_follow(session, enqueuer, target=target, follower=follower, follow=activity)
 
 
 async def _send_accept_for_follow(
@@ -293,9 +279,7 @@ async def _handle_undo_follow(
     follow_activity: dict[str, Any],
 ) -> None:
     follower = await _resolve_remote_actor(session, actor_url)
-    target = await _resolve_local_target(
-        session, follow_activity.get("object")
-    )
+    target = await _resolve_local_target(session, follow_activity.get("object"))
     if follower is None or target is None:
         return
     await session.execute(
@@ -354,9 +338,7 @@ def _as_list(value: Any) -> list[Any]:
     return [value]
 
 
-def _derive_visibility(
-    to: list[Any], cc: list[Any], followers_url: str | None
-) -> Visibility:
+def _derive_visibility(to: list[Any], cc: list[Any], followers_url: str | None) -> Visibility:
     """Map AP `to`/`cc` to Mastodon's visibility enum.
 
     Rules (Mastodon-compatible):
@@ -407,9 +389,7 @@ async def _handle_create_note(
         return
 
     # Idempotency: skip if we already have this Status.
-    existing = (
-        await session.execute(select(Status).where(Status.uri == uri))
-    ).scalar_one_or_none()
+    existing = (await session.execute(select(Status).where(Status.uri == uri))).scalar_one_or_none()
     if existing is not None:
         return
 
@@ -438,11 +418,7 @@ async def _handle_create_note(
     in_reply_to_id: int | None = None
     in_reply_to_account_id: int | None = None
     if isinstance(in_reply_to_uri, str) and in_reply_to_uri:
-        parent = (
-            await session.execute(
-                select(Status).where(Status.uri == in_reply_to_uri)
-            )
-        ).scalar_one_or_none()
+        parent = (await session.execute(select(Status).where(Status.uri == in_reply_to_uri))).scalar_one_or_none()
         if parent is not None:
             in_reply_to_id = parent.id
             in_reply_to_account_id = parent.account_id
@@ -510,13 +486,9 @@ def _object_uri(value: Any) -> str | None:
     return None
 
 
-async def _resolve_status_by_uri(
-    session: AsyncSession, uri: str
-) -> Status | None:
+async def _resolve_status_by_uri(session: AsyncSession, uri: str) -> Status | None:
     return (
-        await session.execute(
-            select(Status).where(Status.uri == uri, Status.deleted_at.is_(None))
-        )
+        await session.execute(select(Status).where(Status.uri == uri, Status.deleted_at.is_(None)))
     ).scalar_one_or_none()
 
 

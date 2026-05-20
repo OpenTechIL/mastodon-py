@@ -86,37 +86,30 @@ async def load_filters_for(
     now = now or datetime.now(tz=UTC).replace(tzinfo=None)
 
     filters = (
-        await session.execute(
-            select(CustomFilter).where(CustomFilter.account_id == viewer_account_id)
-        )
-    ).scalars().all()
+        (await session.execute(select(CustomFilter).where(CustomFilter.account_id == viewer_account_id)))
+        .scalars()
+        .all()
+    )
 
     # Filter to the right context + not expired. The context column is a
     # string array; SQLAlchemy's ARRAY contains operator needs Postgres,
     # so we filter in Python — fine for a per-request load of a handful
     # of rows.
-    relevant = [
-        f
-        for f in filters
-        if context in (f.context or [])
-        and (f.expires_at is None or f.expires_at > now)
-    ]
+    relevant = [f for f in filters if context in (f.context or []) and (f.expires_at is None or f.expires_at > now)]
     if not relevant:
         return []
 
     ids = [f.id for f in relevant]
     keyword_rows = (
-        await session.execute(
-            select(CustomFilterKeyword).where(
-                CustomFilterKeyword.custom_filter_id.in_(ids)
-            )
-        )
-    ).scalars().all()
+        (await session.execute(select(CustomFilterKeyword).where(CustomFilterKeyword.custom_filter_id.in_(ids))))
+        .scalars()
+        .all()
+    )
     status_rows = (
         await session.execute(
-            select(
-                CustomFilterStatus.custom_filter_id, CustomFilterStatus.status_id
-            ).where(CustomFilterStatus.custom_filter_id.in_(ids))
+            select(CustomFilterStatus.custom_filter_id, CustomFilterStatus.status_id).where(
+                CustomFilterStatus.custom_filter_id.in_(ids)
+            )
         )
     ).all()
 
@@ -138,9 +131,7 @@ async def load_filters_for(
     ]
 
 
-def apply_filters(
-    status: Status, checks: Iterable[FilterCheck]
-) -> list[FilterResult]:
+def apply_filters(status: Status, checks: Iterable[FilterCheck]) -> list[FilterResult]:
     out: list[FilterResult] = []
     haystack = (status.text or "") + "\n" + (status.spoiler_text or "")
     for check in checks:

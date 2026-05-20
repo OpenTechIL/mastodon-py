@@ -112,9 +112,7 @@ async def post_status(
 
     parent: Status | None = None
     if in_reply_to_id is not None:
-        parent = (
-            await session.execute(select(Status).where(Status.id == in_reply_to_id))
-        ).scalar_one_or_none()
+        parent = (await session.execute(select(Status).where(Status.id == in_reply_to_id))).scalar_one_or_none()
         if parent is None or not await visible_to(session, parent, author.id):
             raise StatusValidationError("Replying to a non-existent or invisible status")
 
@@ -124,9 +122,7 @@ async def post_status(
     uri = f"{host}/users/{author.username}/statuses/{new_id}"
     url = f"{host}/@{author.username}/{new_id}"
 
-    inferred_sensitive = (
-        sensitive if sensitive is not None else bool(spoiler_text.strip())
-    )
+    inferred_sensitive = sensitive if sensitive is not None else bool(spoiler_text.strip())
     row = Status(
         id=new_id,
         account_id=author.id,
@@ -175,11 +171,7 @@ async def post_status(
     # `last_status_at` isn't a counter — set it via the ORM so the bind
     # goes through the typed datetime adapter rather than SQLite's
     # deprecated default.
-    await session.execute(
-        update(AccountStat)
-        .where(AccountStat.account_id == author.id)
-        .values(last_status_at=now)
-    )
+    await session.execute(update(AccountStat).where(AccountStat.account_id == author.id).values(last_status_at=now))
 
     # Reply increments the parent's replies_count.
     if parent is not None:
@@ -204,6 +196,7 @@ async def post_status(
 
     # Live streaming: publish to Redis so the streaming server pushes to subscribed clients.
     from app.python.services.streaming import publish_status
+
     await publish_status(session, row, author)
 
     # Outbound federation: deliver to remote followers after commit.
@@ -234,15 +227,20 @@ async def _enqueue_fanout(
     them on first outbound is the only way to keep federation working.
     """
     rows = (
-        await session.execute(
-            select(Account)
-            .join(Follow, Follow.account_id == Account.id)
-            .where(
-                Follow.target_account_id == author.id,
-                Account.domain.is_not(None),
+        (
+            await session.execute(
+                select(Account)
+                .join(Follow, Follow.account_id == Account.id)
+                .where(
+                    Follow.target_account_id == author.id,
+                    Account.domain.is_not(None),
+                )
             )
         )
-    ).unique().scalars().all()
+        .unique()
+        .scalars()
+        .all()
+    )
     inbox_urls = collect_inbox_urls(rows)
     if not inbox_urls:
         return
@@ -338,11 +336,7 @@ async def _attach_media(
     if len(media_ids) > 4:
         raise StatusValidationError("Too many media attachments (max 4)")
 
-    rows = (
-        await session.execute(
-            sa_select(MediaAttachment).where(MediaAttachment.id.in_(media_ids))
-        )
-    ).scalars().all()
+    rows = (await session.execute(sa_select(MediaAttachment).where(MediaAttachment.id.in_(media_ids)))).scalars().all()
     by_id = {row.id: row for row in rows}
 
     for mid in media_ids:
@@ -352,9 +346,7 @@ async def _attach_media(
         if att.account_id != author.id:
             raise StatusValidationError(f"Media attachment {mid} not yours")
         if att.status_id is not None and att.status_id != status.id:
-            raise StatusValidationError(
-                f"Media attachment {mid} is already attached to another status"
-            )
+            raise StatusValidationError(f"Media attachment {mid} is already attached to another status")
         att.status_id = status.id
 
 
@@ -388,9 +380,7 @@ async def _attach_to_conversation(
     )
 
 
-async def _link_hashtags(
-    session: AsyncSession, status: Status, *, now: datetime
-) -> None:
+async def _link_hashtags(session: AsyncSession, status: Status, *, now: datetime) -> None:
     """Extract hashtags from `status.text`, upsert Tag rows, link via StatusTag.
 
     Each tag's `last_status_at` advances to the new status's timestamp,
@@ -404,9 +394,7 @@ async def _link_hashtags(
     if not names:
         return
 
-    existing = (
-        await session.execute(select(Tag).where(Tag.name.in_(names)))
-    ).scalars().all()
+    existing = (await session.execute(select(Tag).where(Tag.name.in_(names)))).scalars().all()
     by_name = {t.name: t for t in existing}
 
     tag_ids: list[int] = []
@@ -457,9 +445,7 @@ async def _link_mentions(
     predicates = []
     for username, domain in parsed:
         if domain is None:
-            predicates.append(
-                and_(Account.username.ilike(username), Account.domain.is_(None))
-            )
+            predicates.append(and_(Account.username.ilike(username), Account.domain.is_(None)))
         else:
             predicates.append(
                 and_(
@@ -467,9 +453,7 @@ async def _link_mentions(
                     Account.domain.ilike(domain),
                 )
             )
-    accounts = (
-        await session.execute(sa_select(Account).where(or_(*predicates)))
-    ).scalars().all()
+    accounts = (await session.execute(sa_select(Account).where(or_(*predicates)))).scalars().all()
 
     for account in accounts:
         if account.id == author.id:

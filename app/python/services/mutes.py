@@ -38,9 +38,7 @@ async def mute(
         raise SelfMute
 
     now = datetime.now(tz=UTC).replace(tzinfo=None)
-    expires_at = (
-        now + timedelta(seconds=duration_seconds) if duration_seconds else None
-    )
+    expires_at = now + timedelta(seconds=duration_seconds) if duration_seconds else None
 
     existing = (
         await session.execute(

@@ -32,10 +32,7 @@ if TYPE_CHECKING:
 
 # Mastodon and most AP servers serve actors with this Accept header.
 # Some return `application/ld+json` instead — both decode the same.
-_ACTOR_ACCEPT = (
-    "application/activity+json,"
-    'application/ld+json;profile="https://www.w3.org/ns/activitystreams"'
-)
+_ACTOR_ACCEPT = 'application/activity+json,application/ld+json;profile="https://www.w3.org/ns/activitystreams"'
 
 
 async def resolve_public_key(
@@ -57,24 +54,16 @@ async def resolve_public_key(
     return await _http_lookup(http_client, key_id=key_id, actor_url=actor_url)
 
 
-async def _local_lookup(
-    session: AsyncSession, *, actor_url: str
-) -> bytes | None:
+async def _local_lookup(session: AsyncSession, *, actor_url: str) -> bytes | None:
     if not actor_url:
         return None
-    row = (
-        await session.execute(
-            select(Account).where(Account.uri == actor_url)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Account).where(Account.uri == actor_url))).scalar_one_or_none()
     if row is None or not row.public_key:
         return None
     return row.public_key.encode("utf-8")
 
 
-async def _http_lookup(
-    client: httpx.AsyncClient, *, key_id: str, actor_url: str
-) -> bytes | None:
+async def _http_lookup(client: httpx.AsyncClient, *, key_id: str, actor_url: str) -> bytes | None:
     if not actor_url.startswith(("https://", "http://")):
         return None
     try:

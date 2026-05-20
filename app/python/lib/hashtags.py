@@ -18,9 +18,7 @@ import re
 # `(?:^|\s|>)` — start-of-string, whitespace, or end of an HTML tag boundary.
 # `[#＃]`     — hash or full-width hash.
 # `(...)`    — captured name: letter-led so pure digits don't match.
-_HASHTAG_RE = re.compile(
-    r"(?:^|(?<=\s)|(?<=>))[#＃]([A-Za-z_][A-Za-z0-9_-]{0,99})"
-)
+_HASHTAG_RE = re.compile(r"(?:^|(?<=\s)|(?<=>))[#＃]([A-Za-z_][A-Za-z0-9_-]{0,99})")
 
 
 def extract(text: str) -> list[str]:

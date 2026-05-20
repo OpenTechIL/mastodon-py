@@ -80,9 +80,7 @@ async def list_notifications(
         response.headers["Link"] = link
 
     statuses_by_notification = await _resolve_statuses(session, ordered)
-    relationships = await load_relationships(
-        session, viewer.id, [s.id for s in statuses_by_notification.values()]
-    )
+    relationships = await load_relationships(session, viewer.id, [s.id for s in statuses_by_notification.values()])
     return [
         serialize_notification(
             n,
@@ -98,9 +96,7 @@ async def clear(
     session: DBSession,
     viewer: CurrentAccount,
 ) -> dict[str, object]:
-    await session.execute(
-        delete(Notification).where(Notification.account_id == viewer.id)
-    )
+    await session.execute(delete(Notification).where(Notification.account_id == viewer.id))
     await session.commit()
     return {}
 
@@ -163,23 +159,17 @@ class NotificationPolicyUpdate(BaseModel):
     filter_private_mentions: bool | None = None
 
 
-async def _get_or_create_web_setting(
-    session: AsyncSession, account_id: int
-) -> WebSetting:
+async def _get_or_create_web_setting(session: AsyncSession, account_id: int) -> WebSetting:
     """Fetch or create the WebSetting row for the given account_id."""
     row = (
         await session.execute(
-            select(WebSetting)
-            .join(User, User.id == WebSetting.user_id)
-            .where(User.account_id == account_id)
+            select(WebSetting).join(User, User.id == WebSetting.user_id).where(User.account_id == account_id)
         )
     ).scalar_one_or_none()
     if row is not None:
         return row
 
-    user = (
-        await session.execute(select(User).where(User.account_id == account_id))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.account_id == account_id))).scalar_one_or_none()
     if user is None:
         # Remote account — no local user; return a transient stub (never persisted).
         now = datetime.now(UTC).replace(tzinfo=None)
@@ -200,9 +190,7 @@ async def _get_notification_policy(session: AsyncSession, account_id: int) -> di
     return {**_POLICY_DEFAULTS, **{k: v for k, v in stored.items() if k in _POLICY_BOOL_KEYS}}
 
 
-async def _save_notification_policy(
-    session: AsyncSession, account_id: int, policy: dict
-) -> None:
+async def _save_notification_policy(session: AsyncSession, account_id: int, policy: dict) -> None:
     """Persist the notification policy into the web_settings row."""
     ws = await _get_or_create_web_setting(session, account_id)
     if ws.user_id == 0:
@@ -252,9 +240,7 @@ async def show(
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     statuses = await _resolve_statuses(session, [row])
-    relationships = await load_relationships(
-        session, viewer.id, [s.id for s in statuses.values()]
-    )
+    relationships = await load_relationships(session, viewer.id, [s.id for s in statuses.values()])
     return serialize_notification(
         row,
         resolved_status=statuses.get(row.id),
@@ -278,9 +264,7 @@ async def dismiss(
     return {}
 
 
-async def _resolve_statuses(
-    session, notifications: list[Notification]
-) -> dict[int, Status]:
+async def _resolve_statuses(session, notifications: list[Notification]) -> dict[int, Status]:
     """Polymorphic batch resolver.
 
     Favourite-type notifications point at a `Favourite` row whose
@@ -304,11 +288,7 @@ async def _resolve_statuses(
 
     if favourite_ids:
         rows = (
-            await session.execute(
-                select(Favourite.id, Favourite.status_id).where(
-                    Favourite.id.in_(favourite_ids)
-                )
-            )
+            await session.execute(select(Favourite.id, Favourite.status_id).where(Favourite.id.in_(favourite_ids)))
         ).all()
         favourite_status_ids = {fav_id: status_id for fav_id, status_id in rows}
         status_ids.extend(favourite_status_ids.values())
@@ -317,22 +297,14 @@ async def _resolve_statuses(
         favourite_id_to_status_id = {}
 
     if mention_ids:
-        rows = (
-            await session.execute(
-                select(Mention.id, Mention.status_id).where(
-                    Mention.id.in_(mention_ids)
-                )
-            )
-        ).all()
+        rows = (await session.execute(select(Mention.id, Mention.status_id).where(Mention.id.in_(mention_ids)))).all()
         mention_id_to_status_id = {mid: sid for mid, sid in rows}
         status_ids.extend(mention_id_to_status_id.values())
     else:
         mention_id_to_status_id = {}
 
     if status_ids:
-        rows = (
-            await session.execute(select(Status).where(Status.id.in_(status_ids)))
-        ).unique().scalars().all()
+        rows = (await session.execute(select(Status).where(Status.id.in_(status_ids)))).unique().scalars().all()
         status_by_id = {s.id: s for s in rows}
     else:
         status_by_id = {}
@@ -461,14 +433,7 @@ async def list_notifications_v2(
 
     # ---- Sideload accounts -------------------------------------------
     account_rows = (
-        (
-            await session.execute(
-                select(Account).where(Account.id.in_(all_account_ids))
-            )
-        )
-        .unique()
-        .scalars()
-        .all()
+        (await session.execute(select(Account).where(Account.id.in_(all_account_ids)))).unique().scalars().all()
         if all_account_ids
         else []
     )
@@ -477,21 +442,11 @@ async def list_notifications_v2(
     # ---- Sideload statuses ------------------------------------------
     relationships = await load_relationships(session, viewer.id, all_status_ids)
     status_rows = (
-        (
-            await session.execute(
-                select(Status).where(Status.id.in_(all_status_ids))
-            )
-        )
-        .unique()
-        .scalars()
-        .all()
+        (await session.execute(select(Status).where(Status.id.in_(all_status_ids)))).unique().scalars().all()
         if all_status_ids
         else []
     )
-    statuses_out = [
-        serialize_status(s, relationships=relationships).model_dump()
-        for s in status_rows
-    ]
+    statuses_out = [serialize_status(s, relationships=relationships).model_dump() for s in status_rows]
 
     return {
         "accounts": accounts_out,
@@ -519,5 +474,3 @@ async def update_notification_policy(
     merged = {**current, **{k: v for k, v in updates.items() if k in _POLICY_BOOL_KEYS}}
     await _save_notification_policy(session, account.id, merged)
     return merged
-
-

@@ -17,16 +17,10 @@ from app.python.db import Base
 
 class Marker(Base):
     __tablename__ = "markers"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id", "timeline", name="index_markers_on_user_id_and_timeline"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "timeline", name="index_markers_on_user_id_and_timeline"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("users.id"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     timeline: Mapped[str] = mapped_column(String, nullable=False, default="")
     last_read_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     lock_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

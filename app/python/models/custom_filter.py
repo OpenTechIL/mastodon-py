@@ -53,9 +53,7 @@ class CustomFilter(Base):
     __tablename__ = "custom_filters"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
     action: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     context: Mapped[list[str]] = mapped_column(
         ARRAY(String).with_variant(JSON(), "sqlite"),

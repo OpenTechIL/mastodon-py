@@ -89,9 +89,7 @@ async def favourite(
         type=NotificationType.FAVOURITE,
     )
     await session.commit()
-    await _enqueue_outbound_like(
-        session, enqueuer, source=account, status=status, favourite_id=row.id
-    )
+    await _enqueue_outbound_like(session, enqueuer, source=account, status=status, favourite_id=row.id)
     return row
 
 
@@ -135,9 +133,7 @@ async def unfavourite(
         delta=-1,
     )
     await session.commit()
-    await _enqueue_outbound_undo_like(
-        session, enqueuer, source=account, status=status, favourite_id=existing_id
-    )
+    await _enqueue_outbound_undo_like(session, enqueuer, source=account, status=status, favourite_id=existing_id)
     return True
 
 
@@ -197,11 +193,7 @@ async def _enqueue_outbound_undo_like(
         await asyncio.to_thread(ensure_local_actor_keys, source)
         await session.commit()
     source_uri = account_uri(source)
-    like_uri = (
-        f"{source_uri}#likes/{favourite_id}"
-        if favourite_id is not None
-        else f"{source_uri}#likes/unknown"
-    )
+    like_uri = f"{source_uri}#likes/{favourite_id}" if favourite_id is not None else f"{source_uri}#likes/unknown"
     inner = {
         "id": like_uri,
         "type": "Like",

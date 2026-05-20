@@ -71,11 +71,7 @@ async def pin(
         return existing
 
     count = (
-        await session.execute(
-            select(func.count()).select_from(StatusPin).where(
-                StatusPin.account_id == author.id
-            )
-        )
+        await session.execute(select(func.count()).select_from(StatusPin).where(StatusPin.account_id == author.id))
     ).scalar_one()
     if count >= MAX_PINNED_STATUSES:
         raise TooManyPins()

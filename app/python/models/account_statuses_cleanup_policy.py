@@ -14,12 +14,12 @@ class AccountStatusesCleanupPolicy(Base):
     __tablename__ = "account_statuses_cleanup_policies"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False, unique=True
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False, unique=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     min_status_age: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1_209_600  # 2 weeks in seconds
+        Integer,
+        nullable=False,
+        default=1_209_600,  # 2 weeks in seconds
     )
     keep_direct: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     keep_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -34,15 +34,11 @@ async def _load_user_appearance(request: Request, session) -> dict:
     if not account_id:
         return {}
 
-    user = (
-        await session.execute(select(User).where(User.account_id == account_id))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.account_id == account_id))).scalar_one_or_none()
     if user is None:
         return {}
 
-    ws = (
-        await session.execute(select(WebSetting).where(WebSetting.user_id == user.id))
-    ).scalar_one_or_none()
+    ws = (await session.execute(select(WebSetting).where(WebSetting.user_id == user.id))).scalar_one_or_none()
     if ws is None:
         return {}
 
@@ -68,14 +64,10 @@ async def _build_initial_state(request: Request, session) -> dict:
         me = str(account_id) if account_id else None
 
         if account_id:
-            user = (
-                await session.execute(select(User).where(User.account_id == account_id))
-            ).scalar_one_or_none()
+            user = (await session.execute(select(User).where(User.account_id == account_id))).scalar_one_or_none()
             if user:
                 ws = (
-                    await session.execute(
-                        select(WebSetting).where(WebSetting.user_id == user.id)
-                    )
+                    await session.execute(select(WebSetting).where(WebSetting.user_id == user.id))
                 ).scalar_one_or_none()
                 if ws:
                     web_settings_data = ws.data or {}

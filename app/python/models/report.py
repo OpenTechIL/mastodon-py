@@ -58,30 +58,20 @@ class Report(Base):
     __tablename__ = "reports"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
-    target_account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
+    target_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
 
     comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    status_ids: Mapped[list[int]] = mapped_column(
-        _PG_OR_JSON_BIGINT_ARRAY, nullable=False, default=list
-    )
-    rule_ids: Mapped[list[int] | None] = mapped_column(
-        _PG_OR_JSON_BIGINT_ARRAY, nullable=True
-    )
+    status_ids: Mapped[list[int]] = mapped_column(_PG_OR_JSON_BIGINT_ARRAY, nullable=False, default=list)
+    rule_ids: Mapped[list[int] | None] = mapped_column(_PG_OR_JSON_BIGINT_ARRAY, nullable=True)
     forwarded: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     uri: Mapped[str | None] = mapped_column(String, nullable=True)
 
     application_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     assigned_account_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     action_taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
-    action_taken_by_account_id: Mapped[int | None] = mapped_column(
-        BigInteger, nullable=True
-    )
+    action_taken_by_account_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)

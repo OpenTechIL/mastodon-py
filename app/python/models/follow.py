@@ -28,12 +28,8 @@ class Follow(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
-    target_account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
+    target_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
     show_reblogs: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notify: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     languages: Mapped[list[str] | None] = mapped_column(

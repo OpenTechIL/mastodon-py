@@ -107,9 +107,7 @@ def _expires_at(now: datetime, expires_in: int | None) -> datetime | None:
     return now + timedelta(seconds=expires_in)
 
 
-async def _owned_filter(
-    session, owner_id: int, filter_id: int
-) -> CustomFilter:
+async def _owned_filter(session, owner_id: int, filter_id: int) -> CustomFilter:
     row = (
         await session.execute(
             select(CustomFilter).where(
@@ -125,32 +123,23 @@ async def _owned_filter(
 
 async def _serialize_filter(session, f: CustomFilter) -> Filter_:
     keywords = (
-        await session.execute(
-            select(CustomFilterKeyword).where(
-                CustomFilterKeyword.custom_filter_id == f.id
-            )
-        )
-    ).scalars().all()
+        (await session.execute(select(CustomFilterKeyword).where(CustomFilterKeyword.custom_filter_id == f.id)))
+        .scalars()
+        .all()
+    )
     statuses = (
-        await session.execute(
-            select(CustomFilterStatus).where(
-                CustomFilterStatus.custom_filter_id == f.id
-            )
-        )
-    ).scalars().all()
+        (await session.execute(select(CustomFilterStatus).where(CustomFilterStatus.custom_filter_id == f.id)))
+        .scalars()
+        .all()
+    )
     return Filter_(
         id=str(f.id),
         title=f.phrase,
         context=list(f.context or []),
         expires_at=f.expires_at,
         filter_action=FilterAction(f.action).name_for_api,
-        keywords=[
-            FilterKeyword_(id=str(k.id), keyword=k.keyword, whole_word=k.whole_word)
-            for k in keywords
-        ],
-        statuses=[
-            FilterStatus_(id=str(s.id), status_id=str(s.status_id)) for s in statuses
-        ],
+        keywords=[FilterKeyword_(id=str(k.id), keyword=k.keyword, whole_word=k.whole_word) for k in keywords],
+        statuses=[FilterStatus_(id=str(s.id), status_id=str(s.status_id)) for s in statuses],
     )
 
 
@@ -163,12 +152,14 @@ async def index(
     viewer: CurrentAccount,
 ) -> list[Filter_]:
     rows = (
-        await session.execute(
-            select(CustomFilter)
-            .where(CustomFilter.account_id == viewer.id)
-            .order_by(CustomFilter.id.asc())
+        (
+            await session.execute(
+                select(CustomFilter).where(CustomFilter.account_id == viewer.id).order_by(CustomFilter.id.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [await _serialize_filter(session, f) for f in rows]
 
 
@@ -181,9 +172,7 @@ async def create(
     try:
         action = parse_filter_action(body.filter_action)
     except ValueError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     context = _validate_context(body.context)
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = CustomFilter(
@@ -227,9 +216,7 @@ async def update(
         try:
             row.action = parse_filter_action(body.filter_action).value
         except ValueError as exc:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
-            ) from exc
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     if body.expires_in is not None:
         now = datetime.now(tz=UTC).replace(tzinfo=None)
         row.expires_at = _expires_at(now, body.expires_in)
@@ -245,19 +232,9 @@ async def destroy(
     viewer: CurrentAccount,
 ) -> dict[str, Any]:
     await _owned_filter(session, viewer.id, filter_id)
-    await session.execute(
-        delete(CustomFilterKeyword).where(
-            CustomFilterKeyword.custom_filter_id == filter_id
-        )
-    )
-    await session.execute(
-        delete(CustomFilterStatus).where(
-            CustomFilterStatus.custom_filter_id == filter_id
-        )
-    )
-    await session.execute(
-        delete(CustomFilter).where(CustomFilter.id == filter_id)
-    )
+    await session.execute(delete(CustomFilterKeyword).where(CustomFilterKeyword.custom_filter_id == filter_id))
+    await session.execute(delete(CustomFilterStatus).where(CustomFilterStatus.custom_filter_id == filter_id))
+    await session.execute(delete(CustomFilter).where(CustomFilter.id == filter_id))
     await session.commit()
     return {}
 
@@ -273,16 +250,17 @@ async def list_keywords(
 ) -> list[FilterKeyword_]:
     await _owned_filter(session, viewer.id, filter_id)
     rows = (
-        await session.execute(
-            select(CustomFilterKeyword)
-            .where(CustomFilterKeyword.custom_filter_id == filter_id)
-            .order_by(CustomFilterKeyword.id.asc())
+        (
+            await session.execute(
+                select(CustomFilterKeyword)
+                .where(CustomFilterKeyword.custom_filter_id == filter_id)
+                .order_by(CustomFilterKeyword.id.asc())
+            )
         )
-    ).scalars().all()
-    return [
-        FilterKeyword_(id=str(k.id), keyword=k.keyword, whole_word=k.whole_word)
-        for k in rows
-    ]
+        .scalars()
+        .all()
+    )
+    return [FilterKeyword_(id=str(k.id), keyword=k.keyword, whole_word=k.whole_word) for k in rows]
 
 
 @router.post(
@@ -298,9 +276,7 @@ async def add_keyword(
 ) -> FilterKeyword_:
     await _owned_filter(session, viewer.id, filter_id)
     if not body.keyword:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="keyword can't be blank"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="keyword can't be blank")
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = CustomFilterKeyword(
         id=now_id(),
@@ -312,9 +288,7 @@ async def add_keyword(
     )
     session.add(row)
     await session.commit()
-    return FilterKeyword_(
-        id=str(row.id), keyword=row.keyword, whole_word=row.whole_word
-    )
+    return FilterKeyword_(id=str(row.id), keyword=row.keyword, whole_word=row.whole_word)
 
 
 @router.delete("/{filter_id}/keywords/{keyword_id}", status_code=status.HTTP_200_OK)
@@ -346,12 +320,16 @@ async def list_statuses(
 ) -> list[FilterStatus_]:
     await _owned_filter(session, viewer.id, filter_id)
     rows = (
-        await session.execute(
-            select(CustomFilterStatus)
-            .where(CustomFilterStatus.custom_filter_id == filter_id)
-            .order_by(CustomFilterStatus.id.asc())
+        (
+            await session.execute(
+                select(CustomFilterStatus)
+                .where(CustomFilterStatus.custom_filter_id == filter_id)
+                .order_by(CustomFilterStatus.id.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [FilterStatus_(id=str(s.id), status_id=str(s.status_id)) for s in rows]
 
 
@@ -380,9 +358,7 @@ async def add_status(
     return FilterStatus_(id=str(row.id), status_id=str(row.status_id))
 
 
-@router.delete(
-    "/{filter_id}/statuses/{filter_status_id}", status_code=status.HTTP_200_OK
-)
+@router.delete("/{filter_id}/statuses/{filter_status_id}", status_code=status.HTTP_200_OK)
 async def remove_status(
     filter_id: int,
     filter_status_id: int,
@@ -419,30 +395,36 @@ class _FilterV1(BaseModel):
 async def index_v1(session: DBSession, viewer: CurrentAccount) -> list[_FilterV1]:
     """v1 flat filter list — first keyword becomes the phrase."""
     rows = (
-        await session.execute(
-            select(CustomFilter)
-            .where(CustomFilter.account_id == viewer.id)
-            .order_by(CustomFilter.id.asc())
+        (
+            await session.execute(
+                select(CustomFilter).where(CustomFilter.account_id == viewer.id).order_by(CustomFilter.id.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     result = []
     for f in rows:
         kws = (
-            await session.execute(
-                select(CustomFilterKeyword)
-                .where(CustomFilterKeyword.custom_filter_id == f.id)
-                .limit(1)
+            (
+                await session.execute(
+                    select(CustomFilterKeyword).where(CustomFilterKeyword.custom_filter_id == f.id).limit(1)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         phrase = kws[0].keyword if kws else ""
         whole_word = kws[0].whole_word if kws else False
-        result.append(_FilterV1(
-            id=str(f.id),
-            phrase=phrase,
-            context=f.context or [],
-            expires_at=f.expires_at,
-            filter_action=str(f.action or "warn"),
-            irreversible=str(f.action) == "hide",
-            whole_word=whole_word,
-        ))
+        result.append(
+            _FilterV1(
+                id=str(f.id),
+                phrase=phrase,
+                context=f.context or [],
+                expires_at=f.expires_at,
+                filter_action=str(f.action or "warn"),
+                irreversible=str(f.action) == "hide",
+                whole_word=whole_word,
+            )
+        )
     return result

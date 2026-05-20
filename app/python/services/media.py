@@ -83,9 +83,7 @@ class MediaValidationError(Exception):
         self.detail = detail
 
 
-def _storage_key(
-    attachment_id: int, variant: Variant, file_name: str
-) -> str:
+def _storage_key(attachment_id: int, variant: Variant, file_name: str) -> str:
     """Paperclip-style relative key for one variant of an attachment.
 
     Splits the id into 4-char chunks so a single directory never holds
@@ -142,11 +140,14 @@ def _generate_waveform(src_path: Path) -> bytes | None:
             [
                 "ffmpeg",
                 "-y",
-                "-i", str(src_path),
+                "-i",
+                str(src_path),
                 "-filter_complex",
                 f"aformat=channel_layouts=mono,showwavespic=s={WAVEFORM_SIZE}",
-                "-frames:v", "1",
-                "-loglevel", "error",
+                "-frames:v",
+                "1",
+                "-loglevel",
+                "error",
                 str(out_path),
             ],
             capture_output=True,
@@ -180,10 +181,12 @@ def _process_audio(
             result = subprocess.run(
                 [
                     "ffprobe",
-                    "-v", "error",
+                    "-v",
+                    "error",
                     "-show_format",
                     "-show_streams",
-                    "-of", "json",
+                    "-of",
+                    "json",
                     str(src_path),
                 ],
                 capture_output=True,
@@ -252,10 +255,12 @@ def _ffprobe_metadata(path: Path) -> dict[str, object] | None:
         result = subprocess.run(
             [
                 "ffprobe",
-                "-v", "error",
+                "-v",
+                "error",
                 "-show_format",
                 "-show_streams",
-                "-of", "json",
+                "-of",
+                "json",
                 str(path),
             ],
             capture_output=True,
@@ -310,10 +315,14 @@ def _extract_video_poster(path: Path) -> bytes | None:
             [
                 "ffmpeg",
                 "-y",
-                "-i", str(path),
-                "-frames:v", "1",
-                "-f", "image2",
-                "-loglevel", "error",
+                "-i",
+                str(path),
+                "-frames:v",
+                "1",
+                "-f",
+                "image2",
+                "-loglevel",
+                "error",
                 str(out_path),
             ],
             capture_output=True,
@@ -354,16 +363,26 @@ def _transcode_video(src_path: Path) -> bytes | None:
             [
                 "ffmpeg",
                 "-y",
-                "-i", str(src_path),
-                "-c:v", "libx264",
-                "-preset", VIDEO_PRESET,
-                "-crf", VIDEO_CRF,
-                "-pix_fmt", "yuv420p",
-                "-vf", f"scale='min({VIDEO_MAX_WIDTH},iw)':-2",
-                "-c:a", "aac",
-                "-b:a", VIDEO_AUDIO_BITRATE,
-                "-movflags", "+faststart",
-                "-loglevel", "error",
+                "-i",
+                str(src_path),
+                "-c:v",
+                "libx264",
+                "-preset",
+                VIDEO_PRESET,
+                "-crf",
+                VIDEO_CRF,
+                "-pix_fmt",
+                "yuv420p",
+                "-vf",
+                f"scale='min({VIDEO_MAX_WIDTH},iw)':-2",
+                "-c:a",
+                "aac",
+                "-b:a",
+                VIDEO_AUDIO_BITRATE,
+                "-movflags",
+                "+faststart",
+                "-loglevel",
+                "error",
                 str(out_path),
             ],
             capture_output=True,
@@ -533,9 +552,7 @@ def _process_image(
         duration_s = total_ms / 1000.0
         original_dims["frames"] = n_frames
         original_dims["duration"] = duration_s
-        original_dims["frame_rate"] = (
-            f"{n_frames}/{int(total_ms / 1000)}" if total_ms >= 1000 else f"{n_frames}/1"
-        )
+        original_dims["frame_rate"] = f"{n_frames}/{int(total_ms / 1000)}" if total_ms >= 1000 else f"{n_frames}/1"
 
     # Small variant: thumbnail in-place (preserves aspect, caps at the max).
     small = img.copy()
@@ -546,7 +563,12 @@ def _process_image(
     small_fmt = "JPEG" if small.mode == "RGB" else "PNG"
     small.save(small_buf, format=small_fmt, quality=85)
     small_bytes = small_buf.getvalue()
-    small_dims = {"width": small.width, "height": small.height, "size": f"{small.width}x{small.height}", "aspect": small.width / small.height if small.height else 0.0}
+    small_dims = {
+        "width": small.width,
+        "height": small.height,
+        "size": f"{small.width}x{small.height}",
+        "aspect": small.width / small.height if small.height else 0.0,
+    }
 
     # Blurhash from a downsampled grid. `blurhash-python` calls Pillow's
     # `Image.getdata()` internally, which is deprecated; suppress that one
@@ -578,9 +600,7 @@ async def upload_media(
 ) -> MediaAttachment:
     media_type = _detect_type(content_type)
     if media_type is MediaType.UNKNOWN:
-        raise MediaValidationError(
-            f"Unsupported media type: {content_type!r}"
-        )
+        raise MediaValidationError(f"Unsupported media type: {content_type!r}")
 
     data = await asyncio.to_thread(file_obj.read)
     max_bytes = {
@@ -589,22 +609,16 @@ async def upload_media(
     }.get(media_type, MAX_IMAGE_BYTES)
     if len(data) > max_bytes:
         kind = media_type.name.title()
-        raise MediaValidationError(
-            f"{kind} too large (max {max_bytes // (1024 * 1024)}MB)"
-        )
+        raise MediaValidationError(f"{kind} too large (max {max_bytes // (1024 * 1024)}MB)")
 
     if media_type is MediaType.VIDEO:
         processed = await asyncio.to_thread(_process_video, data)
         if processed is None:
-            raise MediaValidationError(
-                "Video could not be decoded (ffmpeg/ffprobe missing or unsupported codec)"
-            )
+            raise MediaValidationError("Video could not be decoded (ffmpeg/ffprobe missing or unsupported codec)")
     elif media_type is MediaType.AUDIO:
         processed = await asyncio.to_thread(_process_audio, data)  # type: ignore[arg-type]
         if processed is None:
-            raise MediaValidationError(
-                "Audio could not be decoded (ffprobe missing or unsupported codec)"
-            )
+            raise MediaValidationError("Audio could not be decoded (ffprobe missing or unsupported codec)")
     else:
         processed = await asyncio.to_thread(_process_image, data, target_format="PNG")  # type: ignore[arg-type]
         if processed is None:
@@ -613,17 +627,13 @@ async def upload_media(
 
     attachment_id = now_id()
     storage = get_storage()
-    await storage.write(
-        _storage_key(attachment_id, "original", file_name), original_bytes
-    )
+    await storage.write(_storage_key(attachment_id, "original", file_name), original_bytes)
 
     # `small` is JPEG/PNG (image/video) or PNG (audio waveform).
     small_file_name: str | None = None
     if small_bytes is not None:
         small_file_name = _small_variant_file_name(media_type, file_name)
-        await storage.write(
-            _storage_key(attachment_id, "small", small_file_name), small_bytes
-        )
+        await storage.write(_storage_key(attachment_id, "small", small_file_name), small_bytes)
 
     file_meta: dict[str, object] = {
         # `original_dims` already carries frame_rate/duration when the
@@ -647,9 +657,7 @@ async def upload_media(
         file_file_size=len(original_bytes),
         file_meta=file_meta,
         file_updated_at=now,
-        thumbnail_file_name=(
-            small_file_name if small_file_name and small_file_name != file_name else None
-        ),
+        thumbnail_file_name=(small_file_name if small_file_name and small_file_name != file_name else None),
         thumbnail_content_type="image/png" if media_type is MediaType.AUDIO and small_bytes else None,
         thumbnail_file_size=len(small_bytes) if small_bytes is not None else None,
         remote_url="",
@@ -695,15 +703,11 @@ async def upload_media_async(
     }.get(media_type, MAX_IMAGE_BYTES)
     if len(data) > max_bytes:
         kind = media_type.name.title()
-        raise MediaValidationError(
-            f"{kind} too large (max {max_bytes // (1024 * 1024)}MB)"
-        )
+        raise MediaValidationError(f"{kind} too large (max {max_bytes // (1024 * 1024)}MB)")
 
     attachment_id = now_id()
     storage = get_storage()
-    await storage.write(
-        _storage_key(attachment_id, "original", file_name), data
-    )
+    await storage.write(_storage_key(attachment_id, "original", file_name), data)
 
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = MediaAttachment(
@@ -753,9 +757,7 @@ async def update_media(
     return attachment
 
 
-def asset_url(
-    attachment: MediaAttachment, variant: Variant = "original"
-) -> str | None:
+def asset_url(attachment: MediaAttachment, variant: Variant = "original") -> str | None:
     """Public URL for one variant of the attachment.
 
     Local files served via the reverse proxy at `/system/...`. Returns

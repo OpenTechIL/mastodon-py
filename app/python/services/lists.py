@@ -39,13 +39,9 @@ class NotFollowing(HTTPException):
         )
 
 
-async def _list_for(
-    session: AsyncSession, owner: Account, list_id: int
-) -> List:
+async def _list_for(session: AsyncSession, owner: Account, list_id: int) -> List:
     row = (
-        await session.execute(
-            select(List).where(List.id == list_id, List.account_id == owner.id)
-        )
+        await session.execute(select(List).where(List.id == list_id, List.account_id == owner.id))
     ).scalar_one_or_none()
     if row is None:
         raise ListNotFound
@@ -54,13 +50,7 @@ async def _list_for(
 
 async def list_lists(session: AsyncSession, owner: Account) -> list[List]:
     return list(
-        (
-            await session.execute(
-                select(List)
-                .where(List.account_id == owner.id)
-                .order_by(List.id.asc())
-            )
-        ).scalars().all()
+        (await session.execute(select(List).where(List.account_id == owner.id).order_by(List.id.asc()))).scalars().all()
     )
 
 
@@ -128,13 +118,18 @@ async def list_members(
 ) -> list[Account]:
     await _list_for(session, owner, list_id)
     rows = (
-        await session.execute(
-            select(Account)
-            .join(ListAccount, ListAccount.account_id == Account.id)
-            .where(ListAccount.list_id == list_id)
-            .order_by(ListAccount.id.desc())
+        (
+            await session.execute(
+                select(Account)
+                .join(ListAccount, ListAccount.account_id == Account.id)
+                .where(ListAccount.list_id == list_id)
+                .order_by(ListAccount.id.desc())
+            )
         )
-    ).unique().scalars().all()
+        .unique()
+        .scalars()
+        .all()
+    )
     return list(rows)
 
 
@@ -172,7 +167,9 @@ async def add_accounts(
                     ListAccount.account_id.in_(account_ids),
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     )
     for aid in account_ids:
         if aid in existing:

@@ -57,9 +57,7 @@ async def _follows(session: AsyncSession, follower_id: int, target_id: int) -> b
     return row is not None
 
 
-async def _mentioned(
-    session: AsyncSession, viewer_id: int, status_id: int
-) -> bool:
+async def _mentioned(session: AsyncSession, viewer_id: int, status_id: int) -> bool:
     row = (
         await session.execute(
             select(Mention.id)
@@ -73,9 +71,7 @@ async def _mentioned(
     return row is not None
 
 
-async def _blocked_either_way(
-    session: AsyncSession, a: int, b: int
-) -> bool:
+async def _blocked_either_way(session: AsyncSession, a: int, b: int) -> bool:
     row = (
         await session.execute(
             select(Block.id)

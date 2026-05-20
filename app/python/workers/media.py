@@ -46,9 +46,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def _run(
-    session: AsyncSession, storage: Storage, attachment_id: int
-) -> None:
+async def _run(session: AsyncSession, storage: Storage, attachment_id: int) -> None:
     """Process one attachment, in-place on the given session.
 
     Caller owns the transaction — this function only modifies row state
@@ -56,9 +54,7 @@ async def _run(
     failure it flips `processing` to FAILED so the row reflects reality.
     """
     row = (
-        await session.execute(
-            select(MediaAttachment).where(MediaAttachment.id == attachment_id)
-        )
+        await session.execute(select(MediaAttachment).where(MediaAttachment.id == attachment_id))
     ).scalar_one_or_none()
     if row is None:
         return
@@ -105,9 +101,7 @@ async def _run(
 
     if small_bytes is not None:
         small_name = _small_variant_file_name(media_type, row.file_file_name)
-        await storage.write(
-            _storage_key(row.id, "small", small_name), small_bytes
-        )
+        await storage.write(_storage_key(row.id, "small", small_name), small_bytes)
         if small_name != row.file_file_name:
             row.thumbnail_file_name = small_name
             row.thumbnail_content_type = "image/png"
@@ -122,9 +116,7 @@ async def _run(
     row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
 
 
-async def prepare_media_attachment(
-    ctx: dict[str, Any], attachment_id: int
-) -> None:
+async def prepare_media_attachment(ctx: dict[str, Any], attachment_id: int) -> None:
     """arq entry point. Opens its own session + storage + commits."""
     storage = get_storage()
     async with session_factory()() as session:

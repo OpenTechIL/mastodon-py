@@ -34,9 +34,35 @@ ACCOUNT_MAX_DISPLAY_NAME_LENGTH = 30
 ACCOUNT_MAX_NOTE_LENGTH = 500
 ACCOUNT_MAX_PINNED_STATUSES = 5
 ACCOUNT_MAX_PROFILE_FIELDS = 4
-DEFAULT_LANGUAGES = ["en", "ar", "ca", "cs", "de", "el", "es", "fa", "fr", "he",
-                    "hi", "hu", "id", "it", "ja", "ko", "nl", "no", "pl", "pt",
-                    "ro", "ru", "sv", "tr", "uk", "vi", "zh"]
+DEFAULT_LANGUAGES = [
+    "en",
+    "ar",
+    "ca",
+    "cs",
+    "de",
+    "el",
+    "es",
+    "fa",
+    "fr",
+    "he",
+    "hi",
+    "hu",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "no",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sv",
+    "tr",
+    "uk",
+    "vi",
+    "zh",
+]
 
 
 router = APIRouter(tags=["instance"])
@@ -78,22 +104,14 @@ class InstanceV2(BaseModel):
 
 
 async def _stats(session) -> dict[str, int]:
-    user_count = (
-        await session.execute(select(func.count()).select_from(User))
-    ).scalar_one()
+    user_count = (await session.execute(select(func.count()).select_from(User))).scalar_one()
     status_count = (
         await session.execute(
-            select(func.count())
-            .select_from(Status)
-            .where(Status.deleted_at.is_(None), Status.local.is_(True))
+            select(func.count()).select_from(Status).where(Status.deleted_at.is_(None), Status.local.is_(True))
         )
     ).scalar_one()
     domain_count = (
-        await session.execute(
-            select(func.count(distinct(Account.domain))).where(
-                Account.domain.is_not(None)
-            )
-        )
+        await session.execute(select(func.count(distinct(Account.domain))).where(Account.domain.is_not(None)))
     ).scalar_one()
     return {
         "user_count": int(user_count or 0),
@@ -123,6 +141,7 @@ async def _contact_account(session) -> dict | None:
         return None
     account, stat = row
     from app.python.lib.asset_urls import _asset_host
+
     host = _asset_host()
     return {
         "id": str(account.id),
@@ -261,40 +280,81 @@ async def instance_peers(session: DBSession) -> list[str]:
     derivation Mastodon uses. Anonymous-accessible. Federation peers
     typically scrape this to build their own peer graph.
     """
-    rows = (
-        await session.execute(
-            select(distinct(Account.domain)).where(Account.domain.is_not(None))
-        )
-    ).scalars().all()
+    rows = (await session.execute(select(distinct(Account.domain)).where(Account.domain.is_not(None)))).scalars().all()
     return sorted(d for d in rows if d)
 
 
 @router.get("/api/v1/instance/languages", response_model=list[dict[str, str]])
 async def instance_languages() -> list[dict[str, str]]:
     """List of languages supported by this instance (ISO 639-1 codes + names)."""
-    return [
-        {"code": code, "name": name}
-        for code, name in _SUPPORTED_LANGUAGES.items()
-    ]
+    return [{"code": code, "name": name} for code, name in _SUPPORTED_LANGUAGES.items()]
 
 
 _SUPPORTED_LANGUAGES = {
-    "ar": "العربية", "ast": "Asturianu", "bg": "Български", "bn": "বাংলা",
-    "ca": "Català", "co": "Corsu", "cs": "Čeština", "cy": "Cymraeg",
-    "da": "Dansk", "de": "Deutsch", "el": "Ελληνικά", "en": "English",
-    "eo": "Esperanto", "es": "Español", "et": "Eesti", "eu": "Euskara",
-    "fa": "فارسی", "fi": "Suomi", "fr": "Français", "ga": "Gaeilge",
-    "gl": "Galego", "he": "עברית", "hr": "Hrvatski", "hu": "Magyar",
-    "hy": "Հայերեն", "id": "Bahasa Indonesia", "io": "Ido", "is": "Íslenska",
-    "it": "Italiano", "ja": "日本語", "ka": "ქართული", "kk": "Қазақша",
-    "kn": "ಕನ್ನಡ", "ko": "한국어", "ku": "Kurdî", "lt": "Lietuvių",
-    "lv": "Latviešu", "mk": "Македонски", "ml": "മലയാളം", "mr": "मराठी",
-    "ms": "Bahasa Melayu", "nl": "Nederlands", "nn": "Nynorsk", "no": "Norsk",
-    "oc": "Occitan", "pl": "Polski", "pt": "Português", "pt-BR": "Português (Brasil)",
-    "ro": "Română", "ru": "Русский", "sk": "Slovenčina", "sl": "Slovenščina",
-    "sq": "Shqip", "sr": "Српски", "sv": "Svenska", "ta": "தமிழ்",
-    "te": "తెలుగు", "th": "ภาษาไทย", "tr": "Türkçe", "uk": "Українська",
-    "ur": "اردو", "vi": "Tiếng Việt", "zh-CN": "中文(简体)", "zh-HK": "中文(香港)",
+    "ar": "العربية",
+    "ast": "Asturianu",
+    "bg": "Български",
+    "bn": "বাংলা",
+    "ca": "Català",
+    "co": "Corsu",
+    "cs": "Čeština",
+    "cy": "Cymraeg",
+    "da": "Dansk",
+    "de": "Deutsch",
+    "el": "Ελληνικά",
+    "en": "English",
+    "eo": "Esperanto",
+    "es": "Español",
+    "et": "Eesti",
+    "eu": "Euskara",
+    "fa": "فارسی",
+    "fi": "Suomi",
+    "fr": "Français",
+    "ga": "Gaeilge",
+    "gl": "Galego",
+    "he": "עברית",
+    "hr": "Hrvatski",
+    "hu": "Magyar",
+    "hy": "Հայերեն",
+    "id": "Bahasa Indonesia",
+    "io": "Ido",
+    "is": "Íslenska",
+    "it": "Italiano",
+    "ja": "日本語",
+    "ka": "ქართული",
+    "kk": "Қазақша",
+    "kn": "ಕನ್ನಡ",
+    "ko": "한국어",
+    "ku": "Kurdî",
+    "lt": "Lietuvių",
+    "lv": "Latviešu",
+    "mk": "Македонски",
+    "ml": "മലയാളം",
+    "mr": "मराठी",
+    "ms": "Bahasa Melayu",
+    "nl": "Nederlands",
+    "nn": "Nynorsk",
+    "no": "Norsk",
+    "oc": "Occitan",
+    "pl": "Polski",
+    "pt": "Português",
+    "pt-BR": "Português (Brasil)",
+    "ro": "Română",
+    "ru": "Русский",
+    "sk": "Slovenčina",
+    "sl": "Slovenščina",
+    "sq": "Shqip",
+    "sr": "Српски",
+    "sv": "Svenska",
+    "ta": "தமிழ்",
+    "te": "తెలుగు",
+    "th": "ภาษาไทย",
+    "tr": "Türkçe",
+    "uk": "Українська",
+    "ur": "اردو",
+    "vi": "Tiếng Việt",
+    "zh-CN": "中文(简体)",
+    "zh-HK": "中文(香港)",
     "zh-TW": "中文(繁體)",
 }
 
@@ -306,12 +366,16 @@ async def peers_search(session: DBSession, q: str = "") -> list[str]:
         return []
     prefix = q.lower().strip()
     rows = (
-        await session.execute(
-            select(distinct(Account.domain))
-            .where(Account.domain.is_not(None), Account.domain.ilike(f"{prefix}%"))
-            .limit(10)
+        (
+            await session.execute(
+                select(distinct(Account.domain))
+                .where(Account.domain.is_not(None), Account.domain.ilike(f"{prefix}%"))
+                .limit(10)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return sorted(d for d in rows if d)
 
 
@@ -374,6 +438,7 @@ async def annual_report_generate(year: int) -> dict[str, Any]:
 @router.get("/api/v1/annual_reports/{year}")
 async def annual_report(year: int) -> dict[str, Any]:
     from fastapi import HTTPException
+
     raise HTTPException(status_code=404, detail="Not found")
 
 
@@ -410,10 +475,7 @@ async def trends_statuses(session: DBSession) -> list[dict[str, Any]]:
             Status.created_at > cutoff,
         )
         .order_by(
-            (
-                func.coalesce(StatusStat.reblogs_count, 0)
-                + func.coalesce(StatusStat.favourites_count, 0)
-            ).desc(),
+            (func.coalesce(StatusStat.reblogs_count, 0) + func.coalesce(StatusStat.favourites_count, 0)).desc(),
             Status.id.desc(),
         )
         .limit(20)
@@ -426,6 +488,7 @@ async def trends_statuses(session: DBSession) -> list[dict[str, Any]]:
 async def trends_tags(session: DBSession) -> list[dict[str, Any]]:
     """Return the 10 most-used hashtags in the last 7 days with per-day history."""
     from sqlalchemy import Integer, cast, distinct
+
     host = _asset_host()
     now = datetime.now(tz=UTC).replace(tzinfo=None)
     cutoff = now - timedelta(days=7)
@@ -458,9 +521,7 @@ async def trends_tags(session: DBSession) -> list[dict[str, Any]]:
         select(
             StatusTag.tag_id,
             cast(
-                func.floor(
-                    func.extract("epoch", now - Status.created_at) / 86400
-                ),
+                func.floor(func.extract("epoch", now - Status.created_at) / 86400),
                 Integer,
             ).label("day_offset"),
             func.count(StatusTag.status_id).label("uses"),
@@ -494,17 +555,21 @@ async def trends_tags(session: DBSession) -> list[dict[str, Any]]:
             day_dt = now - timedelta(days=offset)
             day_ts = int((day_dt.replace(hour=0, minute=0, second=0, microsecond=0) - epoch).total_seconds())
             counts = day_data.get(row.id, {}).get(offset, {"uses": 0, "accounts": 0})
-            history.append({
-                "day": str(day_ts),
-                "uses": str(counts["uses"]),
-                "accounts": str(counts["accounts"]),
-            })
-        result.append({
-            "name": row.name,
-            "url": f"{host}/tags/{row.name}",
-            "history": history,
-            "following": False,
-        })
+            history.append(
+                {
+                    "day": str(day_ts),
+                    "uses": str(counts["uses"]),
+                    "accounts": str(counts["accounts"]),
+                }
+            )
+        result.append(
+            {
+                "name": row.name,
+                "url": f"{host}/tags/{row.name}",
+                "history": history,
+                "following": False,
+            }
+        )
     return result
 
 
@@ -540,5 +605,3 @@ async def read_annual_report(year: int, account: CurrentAccount) -> dict[str, An
 @router.post("/api/v1/annual_reports/{year}/generate", status_code=200)
 async def generate_annual_report(year: int, account: CurrentAccount) -> dict[str, Any]:
     return {}
-
-

@@ -51,10 +51,10 @@ def _audience(status: Status, author_uri: str) -> tuple[list[str], list[str]]:
 
 
 _MEDIA_TYPE_MAP = {
-    0: "image/jpeg",   # image
-    1: "image/gif",    # gifv
-    2: "video/mp4",    # video
-    3: "audio/mpeg",   # audio
+    0: "image/jpeg",  # image
+    1: "image/gif",  # gifv
+    2: "video/mp4",  # video
+    3: "audio/mpeg",  # audio
     4: "application/octet-stream",  # unknown
 }
 
@@ -103,12 +103,15 @@ def serialize_note(status: Status, author: Account) -> dict:
             if mentioned is not None:
                 m_uri = account_uri(mentioned)
                 m_url = getattr(mentioned, "url", None) or m_uri
-                tags.append({
-                    "type": "Mention",
-                    "href": m_uri,
-                    "name": f"@{mentioned.username}" if not mentioned.domain
-                            else f"@{mentioned.username}@{mentioned.domain}",
-                })
+                tags.append(
+                    {
+                        "type": "Mention",
+                        "href": m_uri,
+                        "name": f"@{mentioned.username}"
+                        if not mentioned.domain
+                        else f"@{mentioned.username}@{mentioned.domain}",
+                    }
+                )
                 # ensure mentioned actor is in cc for non-public posts
                 if m_uri not in cc and m_uri not in to:
                     cc.append(m_uri)
@@ -116,11 +119,13 @@ def serialize_note(status: Status, author: Account) -> dict:
     if status_tags:
         host = _asset_host()
         for tag in status_tags:
-            tags.append({
-                "type": "Hashtag",
-                "href": f"{host}/tags/{tag.name}",
-                "name": f"#{tag.name}",
-            })
+            tags.append(
+                {
+                    "type": "Hashtag",
+                    "href": f"{host}/tags/{tag.name}",
+                    "name": f"#{tag.name}",
+                }
+            )
     if tags:
         note["tag"] = tags
 
@@ -132,16 +137,19 @@ def serialize_note(status: Status, author: Account) -> dict:
             mt = att.file_content_type or _MEDIA_TYPE_MAP.get(att.type, "application/octet-stream")
             url = att.remote_url or (
                 f"{_asset_host()}/system/media_attachments/files/{att.id}/original/{att.file_file_name}"
-                if att.file_file_name else ""
+                if att.file_file_name
+                else ""
             )
             if url:
-                attachments.append({
-                    "type": "Document",
-                    "mediaType": mt,
-                    "url": url,
-                    "name": att.description or None,
-                    "blurhash": getattr(att, "blurhash", None),
-                })
+                attachments.append(
+                    {
+                        "type": "Document",
+                        "mediaType": mt,
+                        "url": url,
+                        "name": att.description or None,
+                        "blurhash": getattr(att, "blurhash", None),
+                    }
+                )
         if attachments:
             note["attachment"] = attachments
 

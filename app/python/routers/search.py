@@ -77,23 +77,15 @@ async def search(
     viewer_account_id = auth.account.id if auth and auth.account else None
 
     if type in (None, "accounts"):
-        out.accounts = await _search_accounts(
-            session, needle, limit, offset, following=following, viewer=auth
-        )
+        out.accounts = await _search_accounts(session, needle, limit, offset, following=following, viewer=auth)
     if type in (None, "hashtags"):
-        out.hashtags = await _search_hashtags(
-            session, needle, limit, offset, viewer_account_id=viewer_account_id
-        )
+        out.hashtags = await _search_hashtags(session, needle, limit, offset, viewer_account_id=viewer_account_id)
     if type in (None, "statuses"):
-        out.statuses = await _search_statuses(
-            session, needle, limit, offset, viewer_account_id=viewer_account_id
-        )
+        out.statuses = await _search_statuses(session, needle, limit, offset, viewer_account_id=viewer_account_id)
     return out
 
 
-async def _search_accounts(
-    session, needle: str, limit: int, offset: int, *, following: bool, viewer
-) -> list[Account_]:
+async def _search_accounts(session, needle: str, limit: int, offset: int, *, following: bool, viewer) -> list[Account_]:
     stmt = (
         select(Account)
         .where(
@@ -110,9 +102,7 @@ async def _search_accounts(
     if following and viewer and viewer.account:
         from app.python.models import Follow
 
-        followee_ids = select(Follow.target_account_id).where(
-            Follow.account_id == viewer.account.id
-        )
+        followee_ids = select(Follow.target_account_id).where(Follow.account_id == viewer.account.id)
         stmt = stmt.where(Account.id.in_(followee_ids))
     rows = (await session.execute(stmt)).unique().scalars().all()
     return [serialize_account(a) for a in rows]
@@ -128,13 +118,7 @@ async def _search_hashtags(
 ) -> list[Tag_]:
     from app.python.models import TagFollow
 
-    stmt = (
-        select(Tag)
-        .where(Tag.name.ilike(needle))
-        .order_by(Tag.id.asc())
-        .offset(offset)
-        .limit(limit)
-    )
+    stmt = select(Tag).where(Tag.name.ilike(needle)).order_by(Tag.id.asc()).offset(offset).limit(limit)
     tags = (await session.execute(stmt)).unique().scalars().all()
     if not tags:
         return []
@@ -142,13 +126,17 @@ async def _search_hashtags(
     following_ids: set[int] = set()
     if viewer_account_id is not None:
         followed = (
-            await session.execute(
-                select(TagFollow.tag_id).where(
-                    TagFollow.account_id == viewer_account_id,
-                    TagFollow.tag_id.in_([t.id for t in tags]),
+            (
+                await session.execute(
+                    select(TagFollow.tag_id).where(
+                        TagFollow.account_id == viewer_account_id,
+                        TagFollow.tag_id.in_([t.id for t in tags]),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         following_ids = set(followed)
     return [serialize_tag(t, following=t.id in following_ids) for t in tags]
 
@@ -171,11 +159,7 @@ async def _search_statuses(
         Status.deleted_at.is_(None),
     ]
     if viewer_account_id is None:
-        base_filter.append(
-            Status.visibility.in_(
-                [Visibility.PUBLIC.value, Visibility.UNLISTED.value]
-            )
-        )
+        base_filter.append(Status.visibility.in_([Visibility.PUBLIC.value, Visibility.UNLISTED.value]))
     stmt = (
         select(Status)
         .where(*base_filter)
@@ -192,7 +176,5 @@ async def _search_statuses(
             if len(visible) >= limit:
                 break
 
-    relationships = await load_relationships(
-        session, viewer_account_id, status_ids_for_batch(visible)
-    )
+    relationships = await load_relationships(session, viewer_account_id, status_ids_for_batch(visible))
     return [serialize_status(s, relationships=relationships) for s in visible]

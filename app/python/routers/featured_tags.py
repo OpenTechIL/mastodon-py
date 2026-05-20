@@ -45,9 +45,7 @@ def _serialize(ft: FeaturedTag, tag: Tag, owner: Account) -> FeaturedTag_:
 
 
 async def _load_owner(session, account_id: int) -> Account:
-    row = (
-        await session.execute(select(Account).where(Account.id == account_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Account).where(Account.id == account_id))).scalar_one_or_none()
     if row is None or row.suspended:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return row
@@ -85,16 +83,10 @@ async def create(
 ) -> FeaturedTag_:
     name = body.name.strip().lstrip("#").lower()
     if not name:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="name can't be blank"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="name can't be blank")
 
     count = (
-        await session.execute(
-            select(func.count()).select_from(FeaturedTag).where(
-                FeaturedTag.account_id == viewer.id
-            )
-        )
+        await session.execute(select(func.count()).select_from(FeaturedTag).where(FeaturedTag.account_id == viewer.id))
     ).scalar_one()
     if count >= MAX_FEATURED_TAGS:
         raise HTTPException(
@@ -104,11 +96,7 @@ async def create(
 
     # Tag must already exist — Mastodon requires you've used a tag at
     # least once before featuring it. If it doesn't exist, 422.
-    tag = (
-        await session.execute(
-            select(Tag).where(func.lower(Tag.name) == name).limit(1)
-        )
-    ).scalar_one_or_none()
+    tag = (await session.execute(select(Tag).where(func.lower(Tag.name) == name).limit(1))).scalar_one_or_none()
     if tag is None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -133,9 +121,7 @@ async def create(
 
     counts_row = (
         await session.execute(
-            select(
-                func.count(Status.id), func.max(Status.created_at)
-            )
+            select(func.count(Status.id), func.max(Status.created_at))
             .select_from(Status)
             .join(StatusTag, StatusTag.status_id == Status.id)
             .where(
@@ -195,7 +181,6 @@ async def index_for_account(
 ) -> list[FeaturedTag_]:
     owner = await _load_owner(session, account_id)
     return await _list_for(session, owner)
-
 
 
 @router.get("/api/v1/featured_tags/suggestions")

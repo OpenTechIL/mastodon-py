@@ -74,9 +74,7 @@ async def favourites_listing(
     params: Annotated[PageParams, Depends(page_params)],
 ) -> list[Status_]:
     stmt = apply_pagination(
-        select(Favourite.id, Favourite.status_id).where(
-            Favourite.account_id == viewer.id
-        ),
+        select(Favourite.id, Favourite.status_id).where(Favourite.account_id == viewer.id),
         Favourite.id,
         params,
     )
@@ -86,9 +84,7 @@ async def favourites_listing(
         return []
 
     status_ids = [c.entity_id for c in ordered]
-    statuses = (
-        await session.execute(select(Status).where(Status.id.in_(status_ids)))
-    ).unique().scalars().all()
+    statuses = (await session.execute(select(Status).where(Status.id.in_(status_ids)))).unique().scalars().all()
     by_id = {s.id: s for s in statuses if not s.discarded}
     rows = [by_id[c.entity_id] for c in ordered if c.entity_id in by_id]
 
@@ -101,9 +97,7 @@ async def favourites_listing(
     if link:
         response.headers["Link"] = link
 
-    relationships = await load_relationships(
-        session, viewer.id, status_ids_for_batch(rows)
-    )
+    relationships = await load_relationships(session, viewer.id, status_ids_for_batch(rows))
     return [serialize_status(s, relationships=relationships) for s in rows]
 
 
@@ -119,9 +113,7 @@ async def bookmarks_listing(
     params: Annotated[PageParams, Depends(page_params)],
 ) -> list[Status_]:
     stmt = apply_pagination(
-        select(Bookmark.id, Bookmark.status_id).where(
-            Bookmark.account_id == viewer.id
-        ),
+        select(Bookmark.id, Bookmark.status_id).where(Bookmark.account_id == viewer.id),
         Bookmark.id,
         params,
     )
@@ -131,9 +123,7 @@ async def bookmarks_listing(
         return []
 
     status_ids = [c.entity_id for c in ordered]
-    statuses = (
-        await session.execute(select(Status).where(Status.id.in_(status_ids)))
-    ).unique().scalars().all()
+    statuses = (await session.execute(select(Status).where(Status.id.in_(status_ids)))).unique().scalars().all()
     by_id = {s.id: s for s in statuses if not s.discarded}
     rows = [by_id[c.entity_id] for c in ordered if c.entity_id in by_id]
 
@@ -146,9 +136,7 @@ async def bookmarks_listing(
     if link:
         response.headers["Link"] = link
 
-    relationships = await load_relationships(
-        session, viewer.id, status_ids_for_batch(rows)
-    )
+    relationships = await load_relationships(session, viewer.id, status_ids_for_batch(rows))
     return [serialize_status(s, relationships=relationships) for s in rows]
 
 
@@ -176,9 +164,7 @@ async def _account_listing(
         return []
 
     account_ids = [c.entity_id for c in ordered]
-    accounts = (
-        await session.execute(select(Account).where(Account.id.in_(account_ids)))
-    ).unique().scalars().all()
+    accounts = (await session.execute(select(Account).where(Account.id.in_(account_ids)))).unique().scalars().all()
     by_id = {a.id: a for a in accounts}
     rows = [by_id[c.entity_id] for c in ordered if c.entity_id in by_id]
 
@@ -255,6 +241,7 @@ async def mutes_listing(
 # Scheduled posting is not yet implemented; return empty list so the
 # Mastodon SPA doesn't break when polling this endpoint on load.
 
+
 @router.get("/api/v1/scheduled_statuses", response_model=list)
 async def scheduled_statuses_index(viewer: CurrentAccount) -> list:
     return []
@@ -266,6 +253,7 @@ async def scheduled_status_show(
     viewer: CurrentAccount,
 ) -> dict:
     from fastapi import HTTPException
+
     raise HTTPException(status_code=404, detail="Record not found")
 
 
@@ -275,6 +263,7 @@ async def scheduled_status_update(
     viewer: CurrentAccount,
 ) -> dict:
     from fastapi import HTTPException
+
     raise HTTPException(status_code=404, detail="Record not found")
 
 
@@ -284,4 +273,5 @@ async def scheduled_status_destroy(
     viewer: CurrentAccount,
 ) -> dict:
     from fastapi import HTTPException
+
     raise HTTPException(status_code=404, detail="Record not found")

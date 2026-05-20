@@ -32,9 +32,7 @@ class Tag(Base):
     trendable: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
-    requested_review_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=False)
-    )
+    requested_review_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     last_status_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     max_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     max_score_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))

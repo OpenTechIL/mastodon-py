@@ -32,6 +32,7 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 # ── auth helper ───────────────────────────────────────────────────────────────
 
+
 async def _require_admin(account: CurrentAccount) -> None:
     """Very basic guard: account must exist (token valid). Full role check
     is deferred until role table is ported."""
@@ -39,6 +40,7 @@ async def _require_admin(account: CurrentAccount) -> None:
 
 
 # ── request / response models ─────────────────────────────────────────────────
+
 
 class _DateRange(BaseModel):
     start_at: str | None = None
@@ -61,8 +63,11 @@ def _parse_dt(s: str | None) -> datetime:
 
 # ── dimensions ────────────────────────────────────────────────────────────────
 
+
 async def _dim_languages(session: AsyncSession, start_at: datetime, end_at: datetime, limit: int) -> dict:
-    rows = (await session.execute(text("""
+    rows = (
+        await session.execute(
+            text("""
         SELECT locale, count(*) AS value
         FROM users
         WHERE updated_at BETWEEN :start_at AND :end_at
@@ -70,7 +75,10 @@ async def _dim_languages(session: AsyncSession, start_at: datetime, end_at: date
         GROUP BY locale
         ORDER BY count(*) DESC
         LIMIT :limit
-    """), {"start_at": start_at, "end_at": end_at, "limit": limit})).fetchall()
+    """),
+            {"start_at": start_at, "end_at": end_at, "limit": limit},
+        )
+    ).fetchall()
     return {
         "key": "languages",
         "data": [{"key": r.locale, "human_key": r.locale, "value": str(r.value)} for r in rows],
@@ -82,7 +90,9 @@ async def _dim_servers(session: AsyncSession, start_at: datetime, end_at: dateti
     local_domain = settings.local_domain
     earliest = snowflake_at(start_at)
     latest = snowflake_at(end_at)
-    rows = (await session.execute(text("""
+    rows = (
+        await session.execute(
+            text("""
         SELECT accounts.domain, count(*) AS value
         FROM statuses
         INNER JOIN accounts ON accounts.id = statuses.account_id
@@ -90,7 +100,10 @@ async def _dim_servers(session: AsyncSession, start_at: datetime, end_at: dateti
         GROUP BY accounts.domain
         ORDER BY count(*) DESC
         LIMIT :limit
-    """), {"earliest": earliest, "latest": latest, "limit": limit})).fetchall()
+    """),
+            {"earliest": earliest, "latest": latest, "limit": limit},
+        )
+    ).fetchall()
     return {
         "key": "servers",
         "data": [
@@ -102,9 +115,9 @@ async def _dim_servers(session: AsyncSession, start_at: datetime, end_at: dateti
 
 async def _dim_sources(session: AsyncSession, start_at: datetime, end_at: datetime, limit: int) -> dict:
     # users table lacks created_by_application_id in this schema — return web only
-    count = (await session.execute(
-        select(func.count()).select_from(User).where(User.created_at.between(start_at, end_at))
-    )).scalar_one()
+    count = (
+        await session.execute(select(func.count()).select_from(User).where(User.created_at.between(start_at, end_at)))
+    ).scalar_one()
     return {
         "key": "sources",
         "data": [{"key": "web", "human_key": "Website", "value": str(count)}],
@@ -118,6 +131,7 @@ async def _dim_space_usage(session: AsyncSession) -> dict:
     # Redis
     try:
         import redis as redis_lib
+
         s = get_settings()
         r = redis_lib.Redis(host=s.redis_host, port=s.redis_port, socket_connect_timeout=1)
         info = r.info("memory")
@@ -136,10 +150,20 @@ async def _dim_space_usage(session: AsyncSession) -> dict:
     return {
         "key": "space_usage",
         "data": [
-            {"key": "postgresql", "human_key": "PostgreSQL",
-             "value": str(pg_size), "unit": "bytes", "human_value": _human(pg_size)},
-            {"key": "redis", "human_key": "Redis",
-             "value": str(redis_size), "unit": "bytes", "human_value": _human(redis_size)},
+            {
+                "key": "postgresql",
+                "human_key": "PostgreSQL",
+                "value": str(pg_size),
+                "unit": "bytes",
+                "human_value": _human(pg_size),
+            },
+            {
+                "key": "redis",
+                "human_key": "Redis",
+                "value": str(redis_size),
+                "unit": "bytes",
+                "human_value": _human(redis_size),
+            },
         ],
     }
 
@@ -155,6 +179,7 @@ async def _dim_software_versions(session: AsyncSession) -> dict:
     # Redis version
     try:
         import redis as redis_lib
+
         s = get_settings()
         r = redis_lib.Redis(host=s.redis_host, port=s.redis_port, socket_connect_timeout=1)
         redis_ver = r.info("server").get("redis_version", "unknown")  # type: ignore[union-attr]
@@ -164,10 +189,10 @@ async def _dim_software_versions(session: AsyncSession) -> dict:
 
     # FFmpeg version
     try:
-        ffmpeg_out = subprocess.run(
-            ["ffmpeg", "-version"], capture_output=True, text=True, timeout=3
-        ).stdout
-        ffmpeg_ver = ffmpeg_out.split("\n")[0].split("version ")[1].split(" ")[0] if "version " in ffmpeg_out else "unknown"
+        ffmpeg_out = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True, timeout=3).stdout
+        ffmpeg_ver = (
+            ffmpeg_out.split("\n")[0].split("version ")[1].split(" ")[0] if "version " in ffmpeg_out else "unknown"
+        )
     except Exception:
         ffmpeg_ver = None
 
@@ -219,6 +244,7 @@ async def dimensions(
 
 # ── measures ──────────────────────────────────────────────────────────────────
 
+
 def _date_series(start: datetime, end: datetime) -> list[datetime]:
     days = []
     cur = start.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -234,20 +260,29 @@ async def _measure_new_users(session: AsyncSession, start_at: datetime, end_at: 
     prev_start = start_at - timedelta(days=length)
     prev_end = start_at - timedelta(days=1)
 
-    total = (await session.execute(text(
-        "SELECT count(*) FROM users WHERE created_at BETWEEN :s AND :e"
-    ), {"s": start_at, "e": end_at})).scalar_one()
+    total = (
+        await session.execute(
+            text("SELECT count(*) FROM users WHERE created_at BETWEEN :s AND :e"), {"s": start_at, "e": end_at}
+        )
+    ).scalar_one()
 
-    prev_total = (await session.execute(text(
-        "SELECT count(*) FROM users WHERE created_at BETWEEN :s AND :e"
-    ), {"s": prev_start, "e": prev_end})).scalar_one()
+    prev_total = (
+        await session.execute(
+            text("SELECT count(*) FROM users WHERE created_at BETWEEN :s AND :e"), {"s": prev_start, "e": prev_end}
+        )
+    ).scalar_one()
 
-    rows = (await session.execute(text("""
+    rows = (
+        await session.execute(
+            text("""
         SELECT date_trunc('day', created_at)::date AS day, count(*) AS cnt
         FROM users
         WHERE created_at BETWEEN :s AND :e
         GROUP BY day ORDER BY day
-    """), {"s": start_at, "e": end_at})).fetchall()
+    """),
+            {"s": start_at, "e": end_at},
+        )
+    ).fetchall()
     counts = {r.day: r.cnt for r in rows}
     data = [
         {"date": d.strftime("%Y-%m-%dT%H:%M:%S.000Z"), "value": str(counts.get(d.date(), 0))}
@@ -261,20 +296,29 @@ async def _measure_opened_reports(session: AsyncSession, start_at: datetime, end
     prev_start = start_at - timedelta(days=length)
     prev_end = start_at - timedelta(days=1)
 
-    total = (await session.execute(text(
-        "SELECT count(*) FROM reports WHERE created_at BETWEEN :s AND :e"
-    ), {"s": start_at, "e": end_at})).scalar_one()
+    total = (
+        await session.execute(
+            text("SELECT count(*) FROM reports WHERE created_at BETWEEN :s AND :e"), {"s": start_at, "e": end_at}
+        )
+    ).scalar_one()
 
-    prev_total = (await session.execute(text(
-        "SELECT count(*) FROM reports WHERE created_at BETWEEN :s AND :e"
-    ), {"s": prev_start, "e": prev_end})).scalar_one()
+    prev_total = (
+        await session.execute(
+            text("SELECT count(*) FROM reports WHERE created_at BETWEEN :s AND :e"), {"s": prev_start, "e": prev_end}
+        )
+    ).scalar_one()
 
-    rows = (await session.execute(text("""
+    rows = (
+        await session.execute(
+            text("""
         SELECT date_trunc('day', created_at)::date AS day, count(*) AS cnt
         FROM reports
         WHERE created_at BETWEEN :s AND :e
         GROUP BY day ORDER BY day
-    """), {"s": start_at, "e": end_at})).fetchall()
+    """),
+            {"s": start_at, "e": end_at},
+        )
+    ).fetchall()
     counts = {r.day: r.cnt for r in rows}
     data = [
         {"date": d.strftime("%Y-%m-%dT%H:%M:%S.000Z"), "value": str(counts.get(d.date(), 0))}
@@ -288,26 +332,42 @@ async def _measure_resolved_reports(session: AsyncSession, start_at: datetime, e
     prev_start = start_at - timedelta(days=length)
     prev_end = start_at - timedelta(days=1)
 
-    total = (await session.execute(text(
-        "SELECT count(*) FROM reports WHERE action_taken_at BETWEEN :s AND :e"
-    ), {"s": start_at, "e": end_at})).scalar_one()
+    total = (
+        await session.execute(
+            text("SELECT count(*) FROM reports WHERE action_taken_at BETWEEN :s AND :e"), {"s": start_at, "e": end_at}
+        )
+    ).scalar_one()
 
-    prev_total = (await session.execute(text(
-        "SELECT count(*) FROM reports WHERE action_taken_at BETWEEN :s AND :e"
-    ), {"s": prev_start, "e": prev_end})).scalar_one()
+    prev_total = (
+        await session.execute(
+            text("SELECT count(*) FROM reports WHERE action_taken_at BETWEEN :s AND :e"),
+            {"s": prev_start, "e": prev_end},
+        )
+    ).scalar_one()
 
-    rows = (await session.execute(text("""
+    rows = (
+        await session.execute(
+            text("""
         SELECT date_trunc('day', action_taken_at)::date AS day, count(*) AS cnt
         FROM reports
         WHERE action_taken_at BETWEEN :s AND :e
         GROUP BY day ORDER BY day
-    """), {"s": start_at, "e": end_at})).fetchall()
+    """),
+            {"s": start_at, "e": end_at},
+        )
+    ).fetchall()
     counts = {r.day: r.cnt for r in rows}
     data = [
         {"date": d.strftime("%Y-%m-%dT%H:%M:%S.000Z"), "value": str(counts.get(d.date(), 0))}
         for d in _date_series(start_at, end_at)
     ]
-    return {"key": "resolved_reports", "unit": None, "total": str(total), "previous_total": str(prev_total), "data": data}
+    return {
+        "key": "resolved_reports",
+        "unit": None,
+        "total": str(total),
+        "previous_total": str(prev_total),
+        "data": data,
+    }
 
 
 async def _measure_active_users(session: AsyncSession, start_at: datetime, end_at: datetime) -> dict:
@@ -316,20 +376,31 @@ async def _measure_active_users(session: AsyncSession, start_at: datetime, end_a
     prev_start = start_at - timedelta(days=length)
     prev_end = start_at - timedelta(days=1)
 
-    total = (await session.execute(text(
-        "SELECT count(DISTINCT id) FROM users WHERE updated_at BETWEEN :s AND :e"
-    ), {"s": start_at, "e": end_at})).scalar_one()
+    total = (
+        await session.execute(
+            text("SELECT count(DISTINCT id) FROM users WHERE updated_at BETWEEN :s AND :e"),
+            {"s": start_at, "e": end_at},
+        )
+    ).scalar_one()
 
-    prev_total = (await session.execute(text(
-        "SELECT count(DISTINCT id) FROM users WHERE updated_at BETWEEN :s AND :e"
-    ), {"s": prev_start, "e": prev_end})).scalar_one()
+    prev_total = (
+        await session.execute(
+            text("SELECT count(DISTINCT id) FROM users WHERE updated_at BETWEEN :s AND :e"),
+            {"s": prev_start, "e": prev_end},
+        )
+    ).scalar_one()
 
-    rows = (await session.execute(text("""
+    rows = (
+        await session.execute(
+            text("""
         SELECT date_trunc('day', updated_at)::date AS day, count(DISTINCT id) AS cnt
         FROM users
         WHERE updated_at BETWEEN :s AND :e
         GROUP BY day ORDER BY day
-    """), {"s": start_at, "e": end_at})).fetchall()
+    """),
+            {"s": start_at, "e": end_at},
+        )
+    ).fetchall()
     counts = {r.day: r.cnt for r in rows}
     data = [
         {"date": d.strftime("%Y-%m-%dT%H:%M:%S.000Z"), "value": str(counts.get(d.date(), 0))}
@@ -348,20 +419,31 @@ async def _measure_interactions(session: AsyncSession, start_at: datetime, end_a
     earliest_prev = snowflake_at(prev_start)
     latest_prev = snowflake_at(prev_end)
 
-    total = (await session.execute(text(
-        "SELECT count(*) FROM statuses WHERE id BETWEEN :s AND :e AND local IS TRUE"
-    ), {"s": earliest, "e": latest})).scalar_one()
+    total = (
+        await session.execute(
+            text("SELECT count(*) FROM statuses WHERE id BETWEEN :s AND :e AND local IS TRUE"),
+            {"s": earliest, "e": latest},
+        )
+    ).scalar_one()
 
-    prev_total = (await session.execute(text(
-        "SELECT count(*) FROM statuses WHERE id BETWEEN :s AND :e AND local IS TRUE"
-    ), {"s": earliest_prev, "e": latest_prev})).scalar_one()
+    prev_total = (
+        await session.execute(
+            text("SELECT count(*) FROM statuses WHERE id BETWEEN :s AND :e AND local IS TRUE"),
+            {"s": earliest_prev, "e": latest_prev},
+        )
+    ).scalar_one()
 
-    rows = (await session.execute(text("""
+    rows = (
+        await session.execute(
+            text("""
         SELECT date_trunc('day', created_at)::date AS day, count(*) AS cnt
         FROM statuses
         WHERE id BETWEEN :s AND :e AND local IS TRUE
         GROUP BY day ORDER BY day
-    """), {"s": earliest, "e": latest})).fetchall()
+    """),
+            {"s": earliest, "e": latest},
+        )
+    ).fetchall()
     counts = {r.day: r.cnt for r in rows}
     data = [
         {"date": d.strftime("%Y-%m-%dT%H:%M:%S.000Z"), "value": str(counts.get(d.date(), 0))}
@@ -402,6 +484,7 @@ async def measures(
 
 
 # ── retention ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/retention", response_model=list[dict[str, Any]])
 async def retention(
@@ -449,9 +532,9 @@ async def retention(
           WHERE retention_period >= cohort_period
         ) AS axis
     """
-    rows = (await session.execute(
-        text(sql), {"start_at": start_at, "end_at": end_at, "frequency": frequency}
-    )).fetchall()
+    rows = (
+        await session.execute(text(sql), {"start_at": start_at, "end_at": end_at, "frequency": frequency})
+    ).fetchall()
 
     cohorts: list[dict] = []
     for row in rows:
@@ -465,15 +548,18 @@ async def retention(
         parts = raw.split(",")
         value = parts[0] if parts else "0"
         rate = float(parts[1]) if len(parts) > 1 else 0.0
-        cohort["data"].append({
-            "date": row.retention_period.isoformat(),
-            "rate": rate,
-            "value": value,
-        })
+        cohort["data"].append(
+            {
+                "date": row.retention_period.isoformat(),
+                "rate": rate,
+                "value": value,
+            }
+        )
     return cohorts
 
 
 # ── trends/tags ───────────────────────────────────────────────────────────────
+
 
 @router.get("/trends/tags", response_model=list[dict[str, Any]])
 async def admin_trends_tags(
@@ -487,14 +573,17 @@ async def admin_trends_tags(
 
     # Return tags ordered by usage (statuses count via StatusTag)
     from app.python.models.status_tag import StatusTag
-    rows = (await session.execute(
-        select(Tag, func.count(StatusTag.status_id).label("uses"))
-        .outerjoin(StatusTag, StatusTag.tag_id == Tag.id)
-        .group_by(Tag.id)
-        .order_by(func.count(StatusTag.status_id).desc())
-        .offset(offset)
-        .limit(limit)
-    )).all()
+
+    rows = (
+        await session.execute(
+            select(Tag, func.count(StatusTag.status_id).label("uses"))
+            .outerjoin(StatusTag, StatusTag.tag_id == Tag.id)
+            .group_by(Tag.id)
+            .order_by(func.count(StatusTag.status_id).desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
 
     return [
         {
@@ -512,6 +601,7 @@ async def admin_trends_tags(
 
 # ── admin/reports ─────────────────────────────────────────────────────────────
 
+
 @router.get("/reports/{report_id}", response_model=dict[str, Any])
 async def admin_get_report(
     report_id: int,
@@ -520,18 +610,12 @@ async def admin_get_report(
 ) -> dict[str, Any]:
     from app.python.schemas.account import serialize_account
 
-    report = (await session.execute(
-        select(Report).where(Report.id == report_id)
-    )).scalar_one_or_none()
+    report = (await session.execute(select(Report).where(Report.id == report_id))).scalar_one_or_none()
     if report is None:
         raise HTTPException(status_code=404, detail="Record not found")
 
-    target = (await session.execute(
-        select(Account).where(Account.id == report.target_account_id)
-    )).scalar_one_or_none()
-    reporter = (await session.execute(
-        select(Account).where(Account.id == report.account_id)
-    )).scalar_one_or_none()
+    target = (await session.execute(select(Account).where(Account.id == report.target_account_id))).scalar_one_or_none()
+    reporter = (await session.execute(select(Account).where(Account.id == report.account_id))).scalar_one_or_none()
 
     return {
         "id": str(report.id),

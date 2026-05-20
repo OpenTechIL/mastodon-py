@@ -21,12 +21,14 @@ from app.python.db import Base
 
 class _StringList(TypeDecorator):
     """varchar[] on Postgres, JSON-encoded text on SQLite (for tests)."""
+
     impl = Text
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
         if dialect.name == "postgresql":
             from sqlalchemy.dialects.postgresql import ARRAY
+
             return dialect.type_descriptor(ARRAY(String))
         return dialect.type_descriptor(Text())
 
@@ -36,6 +38,7 @@ class _StringList(TypeDecorator):
         if value is None:
             return None
         import json
+
         return json.dumps(value)
 
     def process_result_value(self, value, dialect):
@@ -44,6 +47,7 @@ class _StringList(TypeDecorator):
         if value is None:
             return None
         import json
+
         return json.loads(value)
 
 
@@ -55,9 +59,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
 
     email: Mapped[str] = mapped_column(String, nullable=False, default="")
     encrypted_password: Mapped[str] = mapped_column(String, nullable=False, default="")
@@ -66,9 +68,7 @@ class User(Base):
     approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     disabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    otp_required_for_login: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False
-    )
+    otp_required_for_login: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     otp_secret: Mapped[str | None] = mapped_column(String, nullable=True)
     consumed_timestep: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

@@ -32,9 +32,7 @@ class SelfBlock(Exception):
     """Raised when an account tries to block itself."""
 
 
-async def _tear_down_follow(
-    session: AsyncSession, follower_id: int, target_id: int
-) -> None:
+async def _tear_down_follow(session: AsyncSession, follower_id: int, target_id: int) -> None:
     """Destroy a Follow and decrement the relevant counters.
 
     Inlined from `services.follows.unfollow` because the block side
@@ -65,9 +63,7 @@ async def _tear_down_follow(
         )
 
 
-async def _tear_down_follow_request(
-    session: AsyncSession, follower_id: int, target_id: int
-) -> None:
+async def _tear_down_follow_request(session: AsyncSession, follower_id: int, target_id: int) -> None:
     await session.execute(
         delete(FollowRequest).where(
             FollowRequest.account_id == follower_id,

@@ -127,9 +127,7 @@ async def reblog(
         type=NotificationType.REBLOG,
     )
     await session.commit()
-    await _enqueue_outbound_announce(
-        session, enqueuer, source=account, wrapper=wrapper, parent=parent
-    )
+    await _enqueue_outbound_announce(session, enqueuer, source=account, wrapper=wrapper, parent=parent)
     return wrapper
 
 
@@ -178,27 +176,28 @@ async def unreblog(
         delta=-1,
     )
     await session.commit()
-    await _enqueue_outbound_undo_announce(
-        session, enqueuer, source=account, parent=parent, wrapper_uri=wrapper_uri
-    )
+    await _enqueue_outbound_undo_announce(session, enqueuer, source=account, parent=parent, wrapper_uri=wrapper_uri)
     return True
 
 
-async def _collect_announce_inboxes(
-    session: AsyncSession, *, source: Account, parent: Status
-) -> list[str]:
+async def _collect_announce_inboxes(session: AsyncSession, *, source: Account, parent: Status) -> list[str]:
     """Audience: source's remote followers + parent author's inbox
     (when remote). Deduped via `collect_inbox_urls`."""
     rows = (
-        await session.execute(
-            select(Account)
-            .join(Follow, Follow.account_id == Account.id)
-            .where(
-                Follow.target_account_id == source.id,
-                Account.domain.is_not(None),
+        (
+            await session.execute(
+                select(Account)
+                .join(Follow, Follow.account_id == Account.id)
+                .where(
+                    Follow.target_account_id == source.id,
+                    Account.domain.is_not(None),
+                )
             )
         )
-    ).unique().scalars().all()
+        .unique()
+        .scalars()
+        .all()
+    )
     # Include parent author so they get the notification.
     accounts: list[Account] = list(rows)
     author = parent.account
@@ -217,9 +216,7 @@ async def _enqueue_outbound_announce(
 ) -> None:
     if enqueuer is None or not source.local or not parent.uri:
         return
-    inbox_urls = await _collect_announce_inboxes(
-        session, source=source, parent=parent
-    )
+    inbox_urls = await _collect_announce_inboxes(session, source=source, parent=parent)
     if not inbox_urls:
         return
     if not source.private_key:
@@ -249,9 +246,7 @@ async def _enqueue_outbound_undo_announce(
 ) -> None:
     if enqueuer is None or not source.local or not parent.uri:
         return
-    inbox_urls = await _collect_announce_inboxes(
-        session, source=source, parent=parent
-    )
+    inbox_urls = await _collect_announce_inboxes(session, source=source, parent=parent)
     if not inbox_urls:
         return
     if not source.private_key:

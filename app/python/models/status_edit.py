@@ -27,24 +27,16 @@ class StatusEdit(Base):
     __tablename__ = "status_edits"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    status_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("statuses.id"), nullable=False
-    )
+    status_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=False)
     account_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     spoiler_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sensitive: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
-    ordered_media_attachment_ids: Mapped[list[int] | None] = mapped_column(
-        _PG_OR_JSON_BIGINT_ARRAY, nullable=True
-    )
-    media_descriptions: Mapped[list[str] | None] = mapped_column(
-        _PG_OR_JSON_TEXT_ARRAY, nullable=True
-    )
-    poll_options: Mapped[list[str] | None] = mapped_column(
-        ARRAY(String).with_variant(JSON(), "sqlite"), nullable=True
-    )
+    ordered_media_attachment_ids: Mapped[list[int] | None] = mapped_column(_PG_OR_JSON_BIGINT_ARRAY, nullable=True)
+    media_descriptions: Mapped[list[str] | None] = mapped_column(_PG_OR_JSON_TEXT_ARRAY, nullable=True)
+    poll_options: Mapped[list[str] | None] = mapped_column(ARRAY(String).with_variant(JSON(), "sqlite"), nullable=True)
     quote_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)

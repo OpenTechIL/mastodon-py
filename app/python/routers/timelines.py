@@ -83,14 +83,9 @@ async def public_timeline(
         response.headers["Link"] = link
 
     viewer_account_id = auth.account.id if (auth and auth.account) else None
-    relationships = await load_relationships(
-        session, viewer_account_id, status_ids_for_batch(ordered)
-    )
+    relationships = await load_relationships(session, viewer_account_id, status_ids_for_batch(ordered))
     filter_checks = await load_filters_for(session, viewer_account_id, "public")
-    return [
-        serialize_status(row, relationships=relationships, filter_checks=filter_checks)
-        for row in ordered
-    ]
+    return [serialize_status(row, relationships=relationships, filter_checks=filter_checks) for row in ordered]
 
 
 def _extra_for_link(*, local: bool, remote: bool) -> dict[str, str]:
@@ -154,14 +149,9 @@ async def home_timeline(
     if link:
         response.headers["Link"] = link
 
-    relationships = await load_relationships(
-        session, account.id, status_ids_for_batch(ordered)
-    )
+    relationships = await load_relationships(session, account.id, status_ids_for_batch(ordered))
     filter_checks = await load_filters_for(session, account.id, "home")
-    return [
-        serialize_status(row, relationships=relationships, filter_checks=filter_checks)
-        for row in ordered
-    ]
+    return [serialize_status(row, relationships=relationships, filter_checks=filter_checks) for row in ordered]
 
 
 @router.get("/tag/{hashtag}", response_model=list[Status_])
@@ -197,9 +187,14 @@ async def tag_timeline(
     rows = (await session.execute(stmt)).unique().scalars().all()
     ordered = maybe_reverse(rows, params)
     if ordered:
-        response.headers["Link"] = build_link_header(
-            str(request.url.include_query_params().replace(query="")), ordered, params,
-        ) or ""
+        response.headers["Link"] = (
+            build_link_header(
+                str(request.url.include_query_params().replace(query="")),
+                ordered,
+                params,
+            )
+            or ""
+        )
     viewer_id = auth.account.id if auth and auth.account else None
     relationships = await load_relationships(session, viewer_id, status_ids_for_batch(ordered))
     return [serialize_status(row, relationships=relationships) for row in ordered]
@@ -215,25 +210,28 @@ async def list_timeline(
     params: Annotated[PageParams, Depends(page_params)],
 ) -> list[Status_]:
     from fastapi import HTTPException
+
     list_q = select(List_).where(List_.id == list_id, List_.account_id == account.id)
     lst = (await session.execute(list_q)).scalars().first()
     if not lst:
         raise HTTPException(status_code=404, detail="Record not found")
     member_ids = select(ListAccount.account_id).where(ListAccount.list_id == list_id)
-    stmt = (
-        select(Status)
-        .where(
-            Status.account_id.in_(member_ids),
-            Status.deleted_at.is_(None),
-        )
+    stmt = select(Status).where(
+        Status.account_id.in_(member_ids),
+        Status.deleted_at.is_(None),
     )
     stmt = apply_pagination(stmt, Status.id, params)
     rows = (await session.execute(stmt)).unique().scalars().all()
     ordered = maybe_reverse(rows, params)
     if ordered:
-        response.headers["Link"] = build_link_header(
-            str(request.url.include_query_params().replace(query="")), ordered, params,
-        ) or ""
+        response.headers["Link"] = (
+            build_link_header(
+                str(request.url.include_query_params().replace(query="")),
+                ordered,
+                params,
+            )
+            or ""
+        )
     relationships = await load_relationships(session, account.id, status_ids_for_batch(ordered))
     return [serialize_status(row, relationships=relationships) for row in ordered]
 

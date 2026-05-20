@@ -95,13 +95,17 @@ async def load_account_relationships(
         )
     ).all()
     incoming_follows = (
-        await session.execute(
-            select(Follow.account_id).where(
-                Follow.target_account_id == viewer_account_id,
-                Follow.account_id.in_(ids),
+        (
+            await session.execute(
+                select(Follow.account_id).where(
+                    Follow.target_account_id == viewer_account_id,
+                    Follow.account_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     outgoing_requests = (
         await session.execute(
             select(
@@ -116,29 +120,41 @@ async def load_account_relationships(
         )
     ).all()
     incoming_requests = (
-        await session.execute(
-            select(FollowRequest.account_id).where(
-                FollowRequest.target_account_id == viewer_account_id,
-                FollowRequest.account_id.in_(ids),
+        (
+            await session.execute(
+                select(FollowRequest.account_id).where(
+                    FollowRequest.target_account_id == viewer_account_id,
+                    FollowRequest.account_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     outgoing_blocks = (
-        await session.execute(
-            select(Block.target_account_id).where(
-                Block.account_id == viewer_account_id,
-                Block.target_account_id.in_(ids),
+        (
+            await session.execute(
+                select(Block.target_account_id).where(
+                    Block.account_id == viewer_account_id,
+                    Block.target_account_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     incoming_blocks = (
-        await session.execute(
-            select(Block.account_id).where(
-                Block.target_account_id == viewer_account_id,
-                Block.account_id.in_(ids),
+        (
+            await session.execute(
+                select(Block.account_id).where(
+                    Block.target_account_id == viewer_account_id,
+                    Block.account_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     outgoing_mutes = (
         await session.execute(
             select(
@@ -160,31 +176,30 @@ async def load_account_relationships(
         )
     ).all()
     endorsed_targets = (
-        await session.execute(
-            select(AccountPin.target_account_id).where(
-                AccountPin.account_id == viewer_account_id,
-                AccountPin.target_account_id.in_(ids),
+        (
+            await session.execute(
+                select(AccountPin.target_account_id).where(
+                    AccountPin.account_id == viewer_account_id,
+                    AccountPin.target_account_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return AccountRelationships(
         following_ids={
-            tid: FollowRow(show_reblogs=sr, notify=n, languages=langs)
-            for tid, sr, n, langs in outgoing_follows
+            tid: FollowRow(show_reblogs=sr, notify=n, languages=langs) for tid, sr, n, langs in outgoing_follows
         },
         followed_by_ids=set(incoming_follows),
         requested_ids={
-            tid: FollowRow(show_reblogs=sr, notify=n, languages=langs)
-            for tid, sr, n, langs in outgoing_requests
+            tid: FollowRow(show_reblogs=sr, notify=n, languages=langs) for tid, sr, n, langs in outgoing_requests
         },
         requested_by_ids=set(incoming_requests),
         blocking_ids=set(outgoing_blocks),
         blocked_by_ids=set(incoming_blocks),
-        muting_ids={
-            tid: MuteRow(hide_notifications=hide, expires_at=expires)
-            for tid, hide, expires in outgoing_mutes
-        },
+        muting_ids={tid: MuteRow(hide_notifications=hide, expires_at=expires) for tid, hide, expires in outgoing_mutes},
         notes={tid: comment for tid, comment in notes},
         endorsed_ids=set(endorsed_targets),
     )

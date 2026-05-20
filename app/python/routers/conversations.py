@@ -54,9 +54,7 @@ async def index(
     params: Annotated[PageParams, Depends(page_params)],
 ) -> list[Conversation_]:
     stmt = apply_pagination(
-        select(AccountConversation).where(
-            AccountConversation.account_id == viewer.id
-        ),
+        select(AccountConversation).where(AccountConversation.account_id == viewer.id),
         AccountConversation.id,
         params,
     )
@@ -75,25 +73,15 @@ async def index(
 
     accounts_by_id: dict[int, Account] = {}
     if participant_ids:
-        accs = (
-            await session.execute(
-                select(Account).where(Account.id.in_(participant_ids))
-            )
-        ).unique().scalars().all()
+        accs = (await session.execute(select(Account).where(Account.id.in_(participant_ids)))).unique().scalars().all()
         accounts_by_id = {a.id: a for a in accs}
 
     statuses_by_id: dict[int, Status] = {}
     if status_ids:
-        sts = (
-            await session.execute(
-                select(Status).where(Status.id.in_(status_ids))
-            )
-        ).unique().scalars().all()
+        sts = (await session.execute(select(Status).where(Status.id.in_(status_ids)))).unique().scalars().all()
         statuses_by_id = {s.id: s for s in sts}
 
-    relationships = await load_relationships(
-        session, viewer.id, list(status_ids)
-    )
+    relationships = await load_relationships(session, viewer.id, list(status_ids))
 
     link = build_link_header(
         str(request.url.include_query_params().replace(query="")),
@@ -105,26 +93,14 @@ async def index(
 
     out: list[Conversation_] = []
     for row in ordered:
-        accts = [
-            accounts_by_id[a]
-            for a in (row.participant_account_ids or [])
-            if a in accounts_by_id
-        ]
-        last = (
-            statuses_by_id.get(row.last_status_id)
-            if row.last_status_id is not None
-            else None
-        )
+        accts = [accounts_by_id[a] for a in (row.participant_account_ids or []) if a in accounts_by_id]
+        last = statuses_by_id.get(row.last_status_id) if row.last_status_id is not None else None
         out.append(
             Conversation_(
                 id=str(row.id),
                 unread=row.unread,
                 accounts=[serialize_account(a) for a in accts],
-                last_status=(
-                    serialize_status(last, relationships=relationships)
-                    if last is not None
-                    else None
-                ),
+                last_status=(serialize_status(last, relationships=relationships) if last is not None else None),
             )
         )
     return out
@@ -190,42 +166,27 @@ async def destroy(
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
-    await session.execute(
-        delete(AccountConversation).where(AccountConversation.id == conversation_id)
-    )
+    await session.execute(delete(AccountConversation).where(AccountConversation.id == conversation_id))
     await session.commit()
     return {}
 
 
-async def _serialize_one(
-    session, viewer: Account, row: AccountConversation
-) -> Conversation_:
+async def _serialize_one(session, viewer: Account, row: AccountConversation) -> Conversation_:
     accs = (
-        await session.execute(
-            select(Account).where(
-                Account.id.in_(row.participant_account_ids or [])
-            )
-        )
-    ).unique().scalars().all()
+        (await session.execute(select(Account).where(Account.id.in_(row.participant_account_ids or []))))
+        .unique()
+        .scalars()
+        .all()
+    )
     last = None
     if row.last_status_id is not None:
-        last = (
-            await session.execute(
-                select(Status).where(Status.id == row.last_status_id)
-            )
-        ).scalar_one_or_none()
-    relationships = await load_relationships(
-        session, viewer.id, [last.id] if last is not None else []
-    )
+        last = (await session.execute(select(Status).where(Status.id == row.last_status_id))).scalar_one_or_none()
+    relationships = await load_relationships(session, viewer.id, [last.id] if last is not None else [])
     return Conversation_(
         id=str(row.id),
         unread=row.unread,
         accounts=[serialize_account(a) for a in accs],
-        last_status=(
-            serialize_status(last, relationships=relationships)
-            if last is not None
-            else None
-        ),
+        last_status=(serialize_status(last, relationships=relationships) if last is not None else None),
     )
 
 
@@ -247,9 +208,7 @@ async def direct_timeline(
     lookup; we go to the source-of-truth via Mention + Status to keep the
     query straightforward.
     """
-    viewer_mention_status_ids = select(Mention.status_id).where(
-        Mention.account_id == viewer.id
-    )
+    viewer_mention_status_ids = select(Mention.status_id).where(Mention.account_id == viewer.id)
     stmt = select(Status).where(
         Status.visibility == Visibility.DIRECT.value,
         Status.deleted_at.is_(None),
@@ -270,7 +229,5 @@ async def direct_timeline(
     if link:
         response.headers["Link"] = link
 
-    relationships = await load_relationships(
-        session, viewer.id, status_ids_for_batch(ordered)
-    )
+    relationships = await load_relationships(session, viewer.id, status_ids_for_batch(ordered))
     return [serialize_status(s, relationships=relationships) for s in ordered]

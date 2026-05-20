@@ -101,8 +101,7 @@ def _sidebar(active: str) -> str:
         ("/settings/export", "Data export", "export"),
     ]
     items = "".join(
-        f'<a href="{href}" class="{"active" if key == active else ""}">{label}</a>'
-        for href, label, key in links
+        f'<a href="{href}" class="{"active" if key == active else ""}">{label}</a>' for href, label, key in links
     )
     return f'<div class="sidebar"><h2>Settings</h2>{items}</div>'
 
@@ -137,6 +136,7 @@ def _require_session(request: Request) -> dict | None:
 
 # ── /settings redirects ───────────────────────────────────────────────────────
 
+
 @router.get("/settings", include_in_schema=False)
 async def settings_root():
     return RedirectResponse("/settings/preferences/appearance", status_code=302)
@@ -148,6 +148,7 @@ async def settings_preferences_root():
 
 
 # ── appearance ────────────────────────────────────────────────────────────────
+
 
 @router.get("/settings/preferences/appearance", response_class=HTMLResponse, include_in_schema=False)
 async def preferences_appearance_get(request: Request, saved: str = ""):
@@ -190,6 +191,7 @@ async def preferences_appearance_post(request: Request):
 
 
 # ── posting defaults ──────────────────────────────────────────────────────────
+
 
 @router.get("/settings/preferences/posting_defaults", response_class=HTMLResponse, include_in_schema=False)
 async def preferences_posting_get(request: Request, saved: str = ""):
@@ -235,6 +237,7 @@ async def preferences_posting_post(request: Request):
 
 # ── notifications prefs ───────────────────────────────────────────────────────
 
+
 @router.get("/settings/preferences/notifications", response_class=HTMLResponse, include_in_schema=False)
 async def preferences_notifications_get(request: Request, saved: str = ""):
     if not _require_session(request):
@@ -261,6 +264,7 @@ async def preferences_notifications_post(request: Request):
 
 # ── profile ───────────────────────────────────────────────────────────────────
 
+
 @router.get("/settings/profile", response_class=HTMLResponse, include_in_schema=False)
 async def settings_profile_get(request: Request):
     if not _require_session(request):
@@ -274,6 +278,7 @@ async def settings_profile_get(request: Request):
 
 # ── export ────────────────────────────────────────────────────────────────────
 
+
 @router.get("/settings/export", response_class=HTMLResponse, include_in_schema=False)
 async def settings_export_get(request: Request):
     if not _require_session(request):
@@ -283,6 +288,7 @@ async def settings_export_get(request: Request):
 
 
 # ── Privacy and reach ─────────────────────────────────────────────────────────
+
 
 @router.get("/settings/privacy", response_class=HTMLResponse, include_in_schema=False)
 async def settings_privacy(request: Request, saved: str = ""):
@@ -296,7 +302,7 @@ async def settings_privacy(request: Request, saved: str = ""):
         return RedirectResponse("/auth/sign_in", status_code=302)
 
     def _checked(val: bool | None) -> str:
-        return ' checked' if val else ''
+        return " checked" if val else ""
 
     content = f"""
 <h1>Privacy and reach</h1>
@@ -365,6 +371,7 @@ async def update_settings_privacy(
 
 # ── /filters ─────────────────────────────────────────────────────────────────
 
+
 def _filter_action_label(action: int) -> str:
     return {0: "warn", 1: "hide", 2: "blur"}.get(action, "warn")
 
@@ -393,23 +400,29 @@ async def filters_index(request: Request, saved: str = ""):
 
     async with session_factory()() as db:
         filters = (
-            await db.execute(
-                select(CustomFilter)
-                .where(CustomFilter.account_id == account_id)
-                .order_by(CustomFilter.phrase)
+            (
+                await db.execute(
+                    select(CustomFilter).where(CustomFilter.account_id == account_id).order_by(CustomFilter.phrase)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         filter_ids = [f.id for f in filters]
         keywords_by_filter: dict[int, list[CustomFilterKeyword]] = {f.id: [] for f in filters}
         if filter_ids:
             kws = (
-                await db.execute(
-                    select(CustomFilterKeyword)
-                    .where(CustomFilterKeyword.custom_filter_id.in_(filter_ids))
-                    .order_by(CustomFilterKeyword.id)
+                (
+                    await db.execute(
+                        select(CustomFilterKeyword)
+                        .where(CustomFilterKeyword.custom_filter_id.in_(filter_ids))
+                        .order_by(CustomFilterKeyword.id)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for kw in kws:
                 keywords_by_filter[kw.custom_filter_id].append(kw)
 
@@ -419,10 +432,10 @@ async def filters_index(request: Request, saved: str = ""):
     else:
         for f in filters:
             kws = keywords_by_filter[f.id]
-            kw_tags = "".join(
-                f'<span class="tag">{"[W] " if kw.whole_word else ""}{kw.keyword}</span>'
-                for kw in kws
-            ) or '<span style="color:#6c7a90;">no keywords</span>'
+            kw_tags = (
+                "".join(f'<span class="tag">{"[W] " if kw.whole_word else ""}{kw.keyword}</span>' for kw in kws)
+                or '<span style="color:#6c7a90;">no keywords</span>'
+            )
             ctx_tags = " ".join(f'<span class="tag">{c}</span>' for c in (f.context or []))
             action = _filter_action_label(f.action)
             expiry = _expiry_label(f.expires_at)
@@ -430,7 +443,7 @@ async def filters_index(request: Request, saved: str = ""):
 <div class="filter-card">
   <div class="filter-card-title">{f.phrase or "(untitled)"}</div>
   <div class="filter-card-meta">
-    Action: <span class="badge badge-{'hide' if action=='hide' else 'warn'}">{action}</span>
+    Action: <span class="badge badge-{"hide" if action == "hide" else "warn"}">{action}</span>
     &nbsp;·&nbsp; Expires: {expiry}
     &nbsp;·&nbsp; Context: {ctx_tags or "—"}
   </div>
@@ -472,12 +485,12 @@ async def filter_create(request: Request):
 
     phrase = str(form.get("phrase", "")).strip()
     action = int(str(form.get("action", "0")))
-    context = [c for c in ["home", "notifications", "public", "thread", "account"]
-               if form.get(f"context_{c}")]
+    context = [c for c in ["home", "notifications", "public", "thread", "account"] if form.get(f"context_{c}")]
     expires_in = form.get("expires_in", "")
     expires_at = None
     if expires_in:
         from datetime import timedelta
+
         expires_at = now + timedelta(seconds=int(str(expires_in)))
 
     keywords_raw = form.getlist("keyword")
@@ -499,13 +512,15 @@ async def filter_create(request: Request):
             kw_text = str(kw_text).strip()
             if not kw_text:
                 continue
-            db.add(CustomFilterKeyword(
-                custom_filter_id=f.id,
-                keyword=kw_text,
-                whole_word=str(idx) in whole_words_raw,
-                created_at=now,
-                updated_at=now,
-            ))
+            db.add(
+                CustomFilterKeyword(
+                    custom_filter_id=f.id,
+                    keyword=kw_text,
+                    whole_word=str(idx) in whole_words_raw,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         await db.commit()
 
     return RedirectResponse("/filters?saved=1", status_code=302)
@@ -519,17 +534,24 @@ async def filter_edit(request: Request, filter_id: int):
     account_id = session.get("account_id")
 
     async with session_factory()() as db:
-        f = (await db.execute(
-            select(CustomFilter)
-            .where(CustomFilter.id == filter_id, CustomFilter.account_id == account_id)
-        )).scalar_one_or_none()
+        f = (
+            await db.execute(
+                select(CustomFilter).where(CustomFilter.id == filter_id, CustomFilter.account_id == account_id)
+            )
+        ).scalar_one_or_none()
         if f is None:
             return RedirectResponse("/filters", status_code=302)
-        kws = (await db.execute(
-            select(CustomFilterKeyword)
-            .where(CustomFilterKeyword.custom_filter_id == filter_id)
-            .order_by(CustomFilterKeyword.id)
-        )).scalars().all()
+        kws = (
+            (
+                await db.execute(
+                    select(CustomFilterKeyword)
+                    .where(CustomFilterKeyword.custom_filter_id == filter_id)
+                    .order_by(CustomFilterKeyword.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     return HTMLResponse(_layout("Edit filter", _filter_form(f, list(kws)), "filters"))
 
@@ -544,19 +566,21 @@ async def filter_update_or_delete(request: Request, filter_id: int):
     method = str(form.get("_method", "")).lower()
 
     async with session_factory()() as db:
-        f = (await db.execute(
-            select(CustomFilter)
-            .where(CustomFilter.id == filter_id, CustomFilter.account_id == account_id)
-        )).scalar_one_or_none()
+        f = (
+            await db.execute(
+                select(CustomFilter).where(CustomFilter.id == filter_id, CustomFilter.account_id == account_id)
+            )
+        ).scalar_one_or_none()
         if f is None:
             return RedirectResponse("/filters", status_code=302)
 
         if method == "delete":
             # Delete keywords first (FK), then filter
-            kws = (await db.execute(
-                select(CustomFilterKeyword)
-                .where(CustomFilterKeyword.custom_filter_id == filter_id)
-            )).scalars().all()
+            kws = (
+                (await db.execute(select(CustomFilterKeyword).where(CustomFilterKeyword.custom_filter_id == filter_id)))
+                .scalars()
+                .all()
+            )
             for kw in kws:
                 await db.delete(kw)
             await db.delete(f)
@@ -567,21 +591,22 @@ async def filter_update_or_delete(request: Request, filter_id: int):
         now = datetime.now(tz=UTC).replace(tzinfo=None)
         f.phrase = str(form.get("phrase", "")).strip()
         f.action = int(str(form.get("action", "0")))
-        f.context = [c for c in ["home", "notifications", "public", "thread", "account"]
-                     if form.get(f"context_{c}")]
+        f.context = [c for c in ["home", "notifications", "public", "thread", "account"] if form.get(f"context_{c}")]
         expires_in = form.get("expires_in", "")
         if expires_in:
             from datetime import timedelta
+
             f.expires_at = now + timedelta(seconds=int(str(expires_in)))
         else:
             f.expires_at = None
         f.updated_at = now
 
         # Replace keywords: delete existing, insert new
-        old_kws = (await db.execute(
-            select(CustomFilterKeyword)
-            .where(CustomFilterKeyword.custom_filter_id == filter_id)
-        )).scalars().all()
+        old_kws = (
+            (await db.execute(select(CustomFilterKeyword).where(CustomFilterKeyword.custom_filter_id == filter_id)))
+            .scalars()
+            .all()
+        )
         for kw in old_kws:
             await db.delete(kw)
         await db.flush()
@@ -592,13 +617,15 @@ async def filter_update_or_delete(request: Request, filter_id: int):
             kw_text = str(kw_text).strip()
             if not kw_text:
                 continue
-            db.add(CustomFilterKeyword(
-                custom_filter_id=filter_id,
-                keyword=kw_text,
-                whole_word=str(idx) in whole_words_raw,
-                created_at=now,
-                updated_at=now,
-            ))
+            db.add(
+                CustomFilterKeyword(
+                    custom_filter_id=filter_id,
+                    keyword=kw_text,
+                    whole_word=str(idx) in whole_words_raw,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         await db.commit()
 
     return RedirectResponse("/filters?saved=1", status_code=302)
@@ -615,7 +642,7 @@ def _filter_form(f: CustomFilter | None, kws: list[CustomFilterKeyword]) -> str:
     ctx_html = "".join(
         f'<label class="checkbox-label" style="margin-bottom:6px;">'
         f'<input type="checkbox" name="context_{c}" value="1" {"checked" if c in ctx else ""}> {c.capitalize()}'
-        f'</label>'
+        f"</label>"
         for c in ["home", "notifications", "public", "thread", "account"]
     )
 
@@ -690,14 +717,14 @@ def _keyword_row(idx: int, keyword: str, whole_word: bool) -> str:
         f'<input type="text" name="keyword" value="{keyword}" placeholder="Keyword">'
         f'<label class="checkbox-label" style="white-space:nowrap;">'
         f'<input type="checkbox" name="whole_word_idx" value="{idx}" {chk}> Whole word'
-        f'</label></div>'
+        f"</label></div>"
     )
 
 
 # ── /statuses_cleanup ─────────────────────────────────────────────────────────
 
 _AGE_OPTIONS = [
-    (604_800,   "1 week"),
+    (604_800, "1 week"),
     (1_209_600, "2 weeks"),
     (2_629_746, "1 month"),
     (5_259_492, "2 months"),
@@ -717,18 +744,18 @@ async def statuses_cleanup_get(request: Request, saved: str = ""):
     flash = "Settings saved." if saved == "1" else ""
 
     async with session_factory()() as db:
-        policy = (await db.execute(
-            select(AccountStatusesCleanupPolicy)
-            .where(AccountStatusesCleanupPolicy.account_id == account_id)
-        )).scalar_one_or_none()
+        policy = (
+            await db.execute(
+                select(AccountStatusesCleanupPolicy).where(AccountStatusesCleanupPolicy.account_id == account_id)
+            )
+        ).scalar_one_or_none()
 
     enabled = policy.enabled if policy else False
     age = policy.min_status_age if policy else 1_209_600
     dis = "" if enabled else "disabled"
 
     age_opts = "".join(
-        f'<option value="{v}" {"selected" if age == v else ""}>{label}</option>'
-        for v, label in _AGE_OPTIONS
+        f'<option value="{v}" {"selected" if age == v else ""}>{label}</option>' for v, label in _AGE_OPTIONS
     )
 
     def cb(name: str, default: bool) -> str:
@@ -806,10 +833,11 @@ async def statuses_cleanup_post(request: Request):
         return int(v) if v.isdigit() and int(v) >= 1 else None
 
     async with session_factory()() as db:
-        policy = (await db.execute(
-            select(AccountStatusesCleanupPolicy)
-            .where(AccountStatusesCleanupPolicy.account_id == account_id)
-        )).scalar_one_or_none()
+        policy = (
+            await db.execute(
+                select(AccountStatusesCleanupPolicy).where(AccountStatusesCleanupPolicy.account_id == account_id)
+            )
+        ).scalar_one_or_none()
 
         if policy is None:
             policy = AccountStatusesCleanupPolicy(
@@ -837,6 +865,7 @@ async def statuses_cleanup_post(request: Request):
 
 # ── /auth/edit ────────────────────────────────────────────────────────────────
 
+
 @router.get("/auth/edit", response_class=HTMLResponse, include_in_schema=False)
 async def auth_edit_get(request: Request, saved: str = ""):
     session = _require_session(request)
@@ -846,14 +875,10 @@ async def auth_edit_get(request: Request, saved: str = ""):
     flash = "Account settings saved." if saved == "1" else ""
 
     async with session_factory()() as db:
-        user = (await db.execute(
-            select(User).where(User.id == user_id)
-        )).scalar_one_or_none()
+        user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
         if user is None:
             return RedirectResponse("/auth/sign_in", status_code=302)
-        account = (await db.execute(
-            select(Account).where(Account.id == user.account_id)
-        )).scalar_one_or_none()
+        account = (await db.execute(select(Account).where(Account.id == user.account_id))).scalar_one_or_none()
 
     email = user.email or ""
     username = account.username if account else ""
@@ -902,14 +927,10 @@ async def auth_edit_post(request: Request):
     new_pw_confirm = str(form.get("new_password_confirmation", ""))
 
     async with session_factory()() as db:
-        user = (await db.execute(
-            select(User).where(User.id == user_id)
-        )).scalar_one_or_none()
+        user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
         if user is None:
             return RedirectResponse("/auth/sign_in", status_code=302)
-        account = (await db.execute(
-            select(Account).where(Account.id == user.account_id)
-        )).scalar_one_or_none()
+        account = (await db.execute(select(Account).where(Account.id == user.account_id))).scalar_one_or_none()
         username = account.username if account else ""
 
         error = ""

@@ -30,19 +30,11 @@ class Poll(Base):
     __tablename__ = "polls"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
-    status_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("statuses.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
+    status_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=False)
 
-    options: Mapped[list[str]] = mapped_column(
-        _PG_OR_JSON_STR_ARRAY, nullable=False, default=list
-    )
-    cached_tallies: Mapped[list[int]] = mapped_column(
-        _PG_OR_JSON_BIGINT_ARRAY, nullable=False, default=list
-    )
+    options: Mapped[list[str]] = mapped_column(_PG_OR_JSON_STR_ARRAY, nullable=False, default=list)
+    cached_tallies: Mapped[list[int]] = mapped_column(_PG_OR_JSON_BIGINT_ARRAY, nullable=False, default=list)
 
     multiple: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     hide_totals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

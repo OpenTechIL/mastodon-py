@@ -1,10 +1,10 @@
 """Small endpoints every Mastodon client hits on launch.
 
-  - `GET /api/v1/custom_emojis` — server emoji palette, public.
-  - `GET /api/v1/markers` + `POST /api/v1/markers` — per-user timeline
-    read positions (auth required).
-  - `GET /api/v1/preferences` — the authed user's posting/reading
-    defaults (auth required).
+- `GET /api/v1/custom_emojis` — server emoji palette, public.
+- `GET /api/v1/markers` + `POST /api/v1/markers` — per-user timeline
+  read positions (auth required).
+- `GET /api/v1/preferences` — the authed user's posting/reading
+  defaults (auth required).
 """
 
 from __future__ import annotations
@@ -46,12 +46,16 @@ def _emoji_url(emoji: CustomEmoji) -> str:
 @router.get("/api/v1/custom_emojis", response_model=list[CustomEmoji_])
 async def custom_emojis_index(session: DBSession) -> list[CustomEmoji_]:
     rows = (
-        await session.execute(
-            select(CustomEmoji)
-            .where(CustomEmoji.disabled.is_(False), CustomEmoji.visible_in_picker.is_(True))
-            .order_by(CustomEmoji.shortcode.asc())
+        (
+            await session.execute(
+                select(CustomEmoji)
+                .where(CustomEmoji.disabled.is_(False), CustomEmoji.visible_in_picker.is_(True))
+                .order_by(CustomEmoji.shortcode.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [
         CustomEmoji_(
             shortcode=e.shortcode,
@@ -98,12 +102,10 @@ async def markers_index(
     if not requested:
         return {}
     rows = (
-        await session.execute(
-            select(Marker).where(
-                Marker.user_id == user.id, Marker.timeline.in_(requested)
-            )
-        )
-    ).scalars().all()
+        (await session.execute(select(Marker).where(Marker.user_id == user.id, Marker.timeline.in_(requested))))
+        .scalars()
+        .all()
+    )
     return {m.timeline: _marker_to_dict(m) for m in rows}
 
 
@@ -134,11 +136,7 @@ async def markers_upsert(
             continue
 
         existing = (
-            await session.execute(
-                select(Marker).where(
-                    Marker.user_id == user.id, Marker.timeline == timeline
-                )
-            )
+            await session.execute(select(Marker).where(Marker.user_id == user.id, Marker.timeline == timeline))
         ).scalar_one_or_none()
         if existing is None:
             row = Marker(

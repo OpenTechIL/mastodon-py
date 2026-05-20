@@ -19,9 +19,7 @@ from __future__ import annotations
 
 import re
 
-_MENTION_RE = re.compile(
-    r"(?<![\w@])@([A-Za-z0-9_]+)(?:@([A-Za-z0-9_.-]+))?"
-)
+_MENTION_RE = re.compile(r"(?<![\w@])@([A-Za-z0-9_]+)(?:@([A-Za-z0-9_.-]+))?")
 
 
 def extract(text: str) -> list[tuple[str, str | None]]:

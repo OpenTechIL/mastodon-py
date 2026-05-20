@@ -28,6 +28,7 @@ def _redis_client():
     import redis.asyncio as redis  # imported lazily so tests without Redis still work
 
     from app.python.settings import get_settings
+
     s = get_settings()
     return redis.Redis(host=s.redis_host, port=s.redis_port, password=s.redis_password)
 
@@ -72,15 +73,19 @@ async def publish_status(
 
             # Fan out to local followers' home timelines
             follower_ids = (
-                await session.execute(
-                    select(Follow.account_id)
-                    .join(Account, Account.id == Follow.account_id)
-                    .where(
-                        Follow.target_account_id == author.id,
-                        Account.domain.is_(None),  # local only
+                (
+                    await session.execute(
+                        select(Follow.account_id)
+                        .join(Account, Account.id == Follow.account_id)
+                        .where(
+                            Follow.target_account_id == author.id,
+                            Account.domain.is_(None),  # local only
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             for fid in follower_ids:
                 pipe.publish(_ns(f"timeline:{fid}", ns), message)

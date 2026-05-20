@@ -54,14 +54,11 @@ async def get_profile(
 ) -> dict[str, Any]:
     ft_rows = (
         await session.execute(
-            select(FeaturedTag, Tag)
-            .join(Tag, Tag.id == FeaturedTag.tag_id)
-            .where(FeaturedTag.account_id == account.id)
+            select(FeaturedTag, Tag).join(Tag, Tag.id == FeaturedTag.tag_id).where(FeaturedTag.account_id == account.id)
         )
     ).all()
     featured_tags = [
-        {"id": str(ft.id), "name": tag.name, "statuses_count": 0, "last_status_at": None}
-        for ft, tag in ft_rows
+        {"id": str(ft.id), "name": tag.name, "statuses_count": 0, "last_status_at": None} for ft, tag in ft_rows
     ]
     return _serialize_profile(account, featured_tags)
 
@@ -94,7 +91,8 @@ async def _apply_text_fields(account: Account, data: dict[str, Any]) -> None:
         if isinstance(raw, list):
             cleaned = [
                 {"name": str(f.get("name", "")).strip(), "value": str(f.get("value", "")).strip()}
-                for f in raw if isinstance(f, dict)
+                for f in raw
+                if isinstance(f, dict)
                 if str(f.get("name", "")).strip() or str(f.get("value", "")).strip()
             ][:4]
             account.fields = cleaned
@@ -102,6 +100,7 @@ async def _apply_text_fields(account: Account, data: dict[str, Any]) -> None:
 
 async def _save_image(account: Account, kind: str, file_bytes: bytes, content_type: str, filename: str) -> None:
     from app.python.storage import get_storage
+
     ext = os.path.splitext(filename)[1] or ".jpg"
     fname = f"original{ext}"
     storage_dir = "avatars" if kind == "avatar" else "headers"

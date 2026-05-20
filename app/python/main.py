@@ -81,7 +81,9 @@ def create_app() -> FastAPI:
         """
         logging.getLogger(__name__).warning(
             "database unavailable for %s %s: %s",
-            request.method, request.url.path, exc.__class__.__name__,
+            request.method,
+            request.url.path,
+            exc.__class__.__name__,
         )
         return JSONResponse(
             status_code=503,

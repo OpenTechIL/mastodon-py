@@ -14,9 +14,7 @@ class StatusStat(Base):
     __tablename__ = "status_stats"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    status_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("statuses.id"), nullable=False, unique=True
-    )
+    status_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=False, unique=True)
     replies_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     reblogs_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     favourites_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)

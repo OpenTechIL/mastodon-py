@@ -22,9 +22,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    env: Literal["development", "test", "production"] = Field(
-        default="development", validation_alias="MASTODON_ENV"
-    )
+    env: Literal["development", "test", "production"] = Field(default="development", validation_alias="MASTODON_ENV")
 
     local_domain: str = "localhost:3000"
     web_domain: str | None = None

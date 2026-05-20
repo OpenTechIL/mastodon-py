@@ -21,11 +21,7 @@ class CustomFilterStatus(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    custom_filter_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("custom_filters.id"), nullable=False
-    )
-    status_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("statuses.id"), nullable=False
-    )
+    custom_filter_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("custom_filters.id"), nullable=False)
+    status_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)

@@ -26,11 +26,7 @@ class ListAccount(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    list_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("lists.id"), nullable=False
-    )
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    list_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("lists.id"), nullable=False)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
     follow_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     follow_request_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

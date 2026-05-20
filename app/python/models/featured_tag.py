@@ -29,12 +29,8 @@ class FeaturedTag(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
-    tag_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("tags.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
+    tag_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("tags.id"), nullable=False)
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     statuses_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     last_status_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))

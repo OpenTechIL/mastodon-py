@@ -40,9 +40,7 @@ async def attach_to_conversation(
     """Create/reuse a Conversation, write the status's conversation_id, and
     upsert AccountConversation rows for the author + each mentioned account.
     """
-    conversation_id = await _resolve_conversation_id(
-        session, status=status, author_id=author_id, now=now
-    )
+    conversation_id = await _resolve_conversation_id(session, status=status, author_id=author_id, now=now)
     status.conversation_id = conversation_id
 
     participants = sorted({author_id, *mentioned_account_ids})
@@ -69,9 +67,7 @@ async def _resolve_conversation_id(
 ) -> int:
     if status.in_reply_to_id is not None:
         parent = (
-            await session.execute(
-                select(Status.conversation_id).where(Status.id == status.in_reply_to_id)
-            )
+            await session.execute(select(Status.conversation_id).where(Status.id == status.in_reply_to_id))
         ).scalar_one_or_none()
         if parent is not None:
             return parent
@@ -129,13 +125,7 @@ async def _upsert_account_conversation(
     )
 
 
-async def mentioned_account_ids_for(
-    session: AsyncSession, status_id: int
-) -> list[int]:
+async def mentioned_account_ids_for(session: AsyncSession, status_id: int) -> list[int]:
     """Return the account ids on Mention rows for a status."""
-    rows = (
-        await session.execute(
-            select(Mention.account_id).where(Mention.status_id == status_id)
-        )
-    ).scalars().all()
+    rows = (await session.execute(select(Mention.account_id).where(Mention.status_id == status_id))).scalars().all()
     return list(rows)

@@ -17,11 +17,7 @@ from app.python.db import Base
 
 class CustomEmoji(Base):
     __tablename__ = "custom_emojis"
-    __table_args__ = (
-        UniqueConstraint(
-            "shortcode", "domain", name="index_custom_emojis_on_shortcode_and_domain"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("shortcode", "domain", name="index_custom_emojis_on_shortcode_and_domain"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     shortcode: Mapped[str] = mapped_column(String, nullable=False, default="")

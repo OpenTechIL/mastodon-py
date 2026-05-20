@@ -39,9 +39,7 @@ class Status(Base, Discardable):
     __tablename__ = "statuses"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
 
     text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     spoiler_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -53,9 +51,7 @@ class Status(Base, Discardable):
 
     in_reply_to_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     in_reply_to_account_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    reblog_of_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("statuses.id"), nullable=True
-    )
+    reblog_of_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=True)
     application_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     conversation_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 

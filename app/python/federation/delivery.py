@@ -75,9 +75,7 @@ async def sign_and_deliver(
     )
 
     try:
-        response = await http_client.post(
-            recipient_inbox_url, content=body, headers=headers
-        )
+        response = await http_client.post(recipient_inbox_url, content=body, headers=headers)
     except Exception:
         return False
     return 200 <= response.status_code < 300

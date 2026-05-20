@@ -38,9 +38,7 @@ async def index(
     params: Annotated[PageParams, Depends(page_params)],
 ) -> list[Account_]:
     stmt = apply_pagination(
-        select(FollowRequest.id, FollowRequest.account_id).where(
-            FollowRequest.target_account_id == viewer.id
-        ),
+        select(FollowRequest.id, FollowRequest.account_id).where(FollowRequest.target_account_id == viewer.id),
         FollowRequest.id,
         params,
     )
@@ -51,9 +49,7 @@ async def index(
         return []
 
     account_ids = [c.account_id for c in ordered]
-    accounts = (
-        await session.execute(select(Account).where(Account.id.in_(account_ids)))
-    ).unique().scalars().all()
+    accounts = (await session.execute(select(Account).where(Account.id.in_(account_ids)))).unique().scalars().all()
     by_id = {a.id: a for a in accounts}
     rows = [by_id[c.account_id] for c in ordered if c.account_id in by_id]
 
@@ -75,14 +71,10 @@ async def authorize(
     session: DBSession,
     viewer: CurrentAccount,
 ) -> Relationship:
-    requester = (
-        await session.execute(select(Account).where(Account.id == account_id))
-    ).scalar_one_or_none()
+    requester = (await session.execute(select(Account).where(Account.id == account_id))).scalar_one_or_none()
     if requester is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
-    result = await follow_service.authorize_follow_request(
-        session, target=viewer, requester=requester
-    )
+    result = await follow_service.authorize_follow_request(session, target=viewer, requester=requester)
     if result is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     rels = await load_account_relationships(session, viewer.id, [account_id])
@@ -95,14 +87,10 @@ async def reject(
     session: DBSession,
     viewer: CurrentAccount,
 ) -> Relationship:
-    requester = (
-        await session.execute(select(Account).where(Account.id == account_id))
-    ).scalar_one_or_none()
+    requester = (await session.execute(select(Account).where(Account.id == account_id))).scalar_one_or_none()
     if requester is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
-    await follow_service.reject_follow_request(
-        session, target=viewer, requester=requester
-    )
+    await follow_service.reject_follow_request(session, target=viewer, requester=requester)
     rels = await load_account_relationships(session, viewer.id, [account_id])
     return serialize_relationship(account_id, rels)
 

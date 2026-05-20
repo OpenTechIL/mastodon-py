@@ -60,12 +60,8 @@ class Notification(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
-    from_account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
+    from_account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
 
     activity_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     activity_type: Mapped[str] = mapped_column(String, nullable=False)

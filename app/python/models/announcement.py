@@ -29,9 +29,7 @@ class Announcement(Base):
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
-    notification_sent_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=False)
-    )
+    notification_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     all_day: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status_ids: Mapped[list[int] | None] = mapped_column(
         ARRAY(BigInteger).with_variant(JSON(), "sqlite"), nullable=True

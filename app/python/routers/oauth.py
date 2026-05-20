@@ -148,9 +148,7 @@ async def token(
                 detail={"error": "unsupported_grant_type"},
             )
     except oauth_service.InvalidClient as exc:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, detail={"error": "invalid_client"}
-        ) from exc
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail={"error": "invalid_client"}) from exc
     except oauth_service.InvalidGrant as exc:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,
@@ -187,7 +185,5 @@ async def revoke(
     client_secret: str | None = Form(default=None),
 ) -> dict[str, Any]:
     """RFC 7009 revoke endpoint: always 200, even on unknown token."""
-    await oauth_service.revoke_token(
-        session, raw_token=token, client_id=client_id, client_secret=client_secret
-    )
+    await oauth_service.revoke_token(session, raw_token=token, client_id=client_id, client_secret=client_secret)
     return {}

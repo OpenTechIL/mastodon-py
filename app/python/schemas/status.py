@@ -92,11 +92,7 @@ def serialize_status(
         }
     )
 
-    filtered = (
-        [serialize_filter_result(r) for r in apply_filters(status, filter_checks)]
-        if filter_checks
-        else []
-    )
+    filtered = [serialize_filter_result(r) for r in apply_filters(status, filter_checks)] if filter_checks else []
     mentions_for_status = (
         [
             {"id": m.id, "username": m.username, "acct": m.acct, "url": m.url}
@@ -122,16 +118,10 @@ def serialize_status(
         if relationships is not None
         else []
     )
-    poll_obj = (
-        relationships.poll_for(status.id) if relationships is not None else None
-    )
+    poll_obj = relationships.poll_for(status.id) if relationships is not None else None
     poll_for_status = None
     if poll_obj is not None:
-        own_votes = (
-            relationships.own_votes_for(poll_obj.id)
-            if relationships is not None
-            else []
-        )
+        own_votes = relationships.own_votes_for(poll_obj.id) if relationships is not None else []
         # `voted=True` whenever there are any own_votes; the serializer's
         # `viewer_account_id` arg is only used to gate that flag, so we
         # pass a sentinel non-None when own_votes is non-empty.
@@ -146,9 +136,7 @@ def serialize_status(
         created_at=status.created_at,
         edited_at=status.edited_at,
         in_reply_to_id=str(status.in_reply_to_id) if status.in_reply_to_id else None,
-        in_reply_to_account_id=(
-            str(status.in_reply_to_account_id) if status.in_reply_to_account_id else None
-        ),
+        in_reply_to_account_id=(str(status.in_reply_to_account_id) if status.in_reply_to_account_id else None),
         sensitive=status.sensitive,
         spoiler_text=status.spoiler_text,
         visibility=visibility_name,

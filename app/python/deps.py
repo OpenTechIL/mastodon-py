@@ -93,9 +93,7 @@ CurrentAccount = Annotated[Account, Depends(get_current_account)]
 
 async def get_current_application(auth: CurrentAuth) -> OAuthApplication:
     if auth.application is None:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, detail="This token has no application"
-        )
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="This token has no application")
     return auth.application
 
 

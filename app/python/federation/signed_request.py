@@ -56,9 +56,7 @@ async def verify_signed_request(
     except ValueError:
         return None
 
-    pem = await resolve_public_key(
-        key_id=parsed.key_id, session=session, http_client=http_client
-    )
+    pem = await resolve_public_key(key_id=parsed.key_id, session=session, http_client=http_client)
     if pem is None:
         return None
 

@@ -44,11 +44,7 @@ def serialize_poll(
     options = [
         PollOption_(
             title=title,
-            votes_count=(
-                poll.cached_tallies[index]
-                if show_totals and index < len(poll.cached_tallies)
-                else None
-            ),
+            votes_count=(poll.cached_tallies[index] if show_totals and index < len(poll.cached_tallies) else None),
         )
         for index, title in enumerate(poll.options)
     ]

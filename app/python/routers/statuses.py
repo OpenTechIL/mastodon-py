@@ -37,9 +37,7 @@ async def _load_visible_status(
     status_id: int,
     viewer_account_id: int | None,
 ) -> Status:
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     if row is None or not await visible_to(session, row, viewer_account_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return row
@@ -82,9 +80,7 @@ async def create(
     # been expired by the commit if expire_on_commit is on.
     new_id = row.id
     account_id = account.id
-    hydrated = (
-        await session.execute(select(Status).where(Status.id == new_id))
-    ).scalar_one()
+    hydrated = (await session.execute(select(Status).where(Status.id == new_id))).scalar_one()
     relationships = await load_relationships(session, account_id, [new_id])
     return serialize_status(hydrated, relationships=relationships)
 
@@ -96,9 +92,7 @@ async def update(
     session: DBSession,
     account: CurrentAccount,
 ) -> Status_:
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     if row is None or row.discarded:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
 
@@ -134,9 +128,7 @@ async def context(
     / 6 levels deep) to keep the unauthenticated cost bounded. Authed
     viewers get the full `CONTEXT_LIMIT` of 4096 each (matching Rails).
     """
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     if row is None or row.discarded:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
 
@@ -153,9 +145,7 @@ async def context(
         descendants_limit = 4096
         depth_limit = None
 
-    ancestors = await _ancestors(
-        session, row, limit=ancestors_limit, viewer_account_id=viewer_account_id
-    )
+    ancestors = await _ancestors(session, row, limit=ancestors_limit, viewer_account_id=viewer_account_id)
     descendants = await _descendants(
         session,
         row,
@@ -167,12 +157,8 @@ async def context(
     ids_to_load = [s.id for s in ancestors] + [s.id for s in descendants]
     relationships = await load_relationships(session, viewer_account_id, ids_to_load)
     return {
-        "ancestors": [
-            serialize_status(s, relationships=relationships) for s in ancestors
-        ],
-        "descendants": [
-            serialize_status(s, relationships=relationships) for s in descendants
-        ],
+        "ancestors": [serialize_status(s, relationships=relationships) for s in ancestors],
+        "descendants": [serialize_status(s, relationships=relationships) for s in descendants],
     }
 
 
@@ -186,11 +172,7 @@ async def _ancestors(
     chain: list[Status] = []
     current_parent_id = status.in_reply_to_id
     while current_parent_id is not None and len(chain) < limit:
-        parent = (
-            await session.execute(
-                select(Status).where(Status.id == current_parent_id)
-            )
-        ).scalar_one_or_none()
+        parent = (await session.execute(select(Status).where(Status.id == current_parent_id))).scalar_one_or_none()
         if parent is None or parent.discarded:
             break
         if await visible_to(session, parent, viewer_account_id):
@@ -222,15 +204,20 @@ async def _descendants(
         if depth_limit is not None and depth >= depth_limit:
             break
         rows = (
-            await session.execute(
-                select(Status)
-                .where(
-                    Status.in_reply_to_id.in_(frontier),
-                    Status.deleted_at.is_(None),
+            (
+                await session.execute(
+                    select(Status)
+                    .where(
+                        Status.in_reply_to_id.in_(frontier),
+                        Status.deleted_at.is_(None),
+                    )
+                    .order_by(Status.id.asc())
                 )
-                .order_by(Status.id.asc())
             )
-        ).unique().scalars().all()
+            .unique()
+            .scalars()
+            .all()
+        )
         next_frontier: list[int] = []
         for child in rows:
             if not await visible_to(session, child, viewer_account_id):
@@ -250,9 +237,7 @@ async def source(
     session: DBSession,
     account: CurrentAccount,
 ) -> StatusSource:
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     if row is None or row.discarded or row.account_id != account.id:
         # Source is author-only — it's only useful for the edit dialog.
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
@@ -265,31 +250,30 @@ async def history(
     session: DBSession,
     auth: OptionalAuth,
 ) -> list[StatusEdit_]:
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     viewer_account_id = auth.account.id if (auth and auth.account) else None
     if row is None or not await visible_to(session, row, viewer_account_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
 
     edits = (
-        await session.execute(
-            select(StatusEdit)
-            .where(StatusEdit.status_id == status_id)
-            # Order by creation time first; snowflake-id tail randomness
-            # can invert two writes within the same second.
-            .order_by(StatusEdit.created_at.asc(), StatusEdit.id.asc())
+        (
+            await session.execute(
+                select(StatusEdit)
+                .where(StatusEdit.status_id == status_id)
+                # Order by creation time first; snowflake-id tail randomness
+                # can invert two writes within the same second.
+                .order_by(StatusEdit.created_at.asc(), StatusEdit.id.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     # Append the current state as the final history entry — mirrors
     # Mastodon's behavior so the client renders a linear "this revision
     # → that revision → … → current" list.
     history_rows = list(edits)
-    return [
-        serialize_edit(e, row.account)
-        for e in history_rows
-    ] + [_current_as_edit(row, row.account)]
+    return [serialize_edit(e, row.account) for e in history_rows] + [_current_as_edit(row, row.account)]
 
 
 def _current_as_edit(status: Status, author: Account) -> StatusEdit_:
@@ -311,9 +295,7 @@ async def destroy(
     session: DBSession,
     account: CurrentAccount,
 ) -> Status_:
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     if row is None or row.discarded:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     try:
@@ -336,9 +318,7 @@ async def show(
     row = await _load_visible_status(session, status_id, viewer_account_id)
     relationships = await load_relationships(session, viewer_account_id, [row.id])
     filter_checks = await load_filters_for(session, viewer_account_id, "thread")
-    return serialize_status(
-        row, relationships=relationships, filter_checks=filter_checks
-    )
+    return serialize_status(row, relationships=relationships, filter_checks=filter_checks)
 
 
 @router.post("/{status_id}/favourite", response_model=Status_)
@@ -350,9 +330,7 @@ async def favourite(
 ) -> Status_:
     row = await _load_visible_status(session, status_id, account.id)
     try:
-        await favourite_service.favourite(
-            session, account=account, status=row, enqueuer=enqueuer
-        )
+        await favourite_service.favourite(session, account=account, status=row, enqueuer=enqueuer)
     except favourite_service.StatusNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     await session.refresh(row, ["stat"])
@@ -368,9 +346,7 @@ async def unfavourite(
     enqueuer: Enqueuer = Depends(get_enqueuer),
 ) -> Status_:
     row = await _load_visible_status(session, status_id, account.id)
-    await favourite_service.unfavourite(
-        session, account=account, status=row, enqueuer=enqueuer
-    )
+    await favourite_service.unfavourite(session, account=account, status=row, enqueuer=enqueuer)
     await session.refresh(row, ["stat"])
     relationships = await load_relationships(session, account.id, [row.id])
     return serialize_status(row, relationships=relationships)
@@ -409,9 +385,7 @@ async def pin(
     session: DBSession,
     account: CurrentAccount,
 ) -> Status_:
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     if row is None or row.discarded:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     try:
@@ -428,9 +402,7 @@ async def unpin(
     session: DBSession,
     account: CurrentAccount,
 ) -> Status_:
-    row = (
-        await session.execute(select(Status).where(Status.id == status_id))
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Status).where(Status.id == status_id))).scalar_one_or_none()
     if row is None or row.discarded:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     try:
@@ -451,11 +423,7 @@ async def reblog(
     parent = await _load_visible_status(session, status_id, account.id)
     parent_id = parent.id  # capture before expire_all invalidates identity-map state
     try:
-        wrapper_id = (
-            await reblog_service.reblog(
-                session, account=account, status=parent, enqueuer=enqueuer
-            )
-        ).id
+        wrapper_id = (await reblog_service.reblog(session, account=account, status=parent, enqueuer=enqueuer)).id
     except favourite_service.StatusNotFound as exc:
         # Parent isn't reblogable (private/direct) — same response shape
         # as "not found" so callers can't probe private posts.
@@ -464,12 +432,8 @@ async def reblog(
     # the wrapper's nested `reblog` and its `stat` reflect the new counts
     # when we re-read them below.
     session.expire_all()
-    hydrated = (
-        await session.execute(select(Status).where(Status.id == wrapper_id))
-    ).scalar_one()
-    relationships = await load_relationships(
-        session, account.id, [wrapper_id, parent_id]
-    )
+    hydrated = (await session.execute(select(Status).where(Status.id == wrapper_id))).scalar_one()
+    relationships = await load_relationships(session, account.id, [wrapper_id, parent_id])
     return serialize_status(hydrated, relationships=relationships)
 
 
@@ -482,9 +446,7 @@ async def unreblog(
 ) -> Status_:
     """Mastodon returns the original status (not the discarded wrapper)."""
     parent = await _load_visible_status(session, status_id, account.id)
-    await reblog_service.unreblog(
-        session, account=account, status=parent, enqueuer=enqueuer
-    )
+    await reblog_service.unreblog(session, account=account, status=parent, enqueuer=enqueuer)
     await session.refresh(parent, ["stat"])
     relationships = await load_relationships(session, account.id, [parent.id])
     return serialize_status(parent, relationships=relationships)
@@ -532,11 +494,7 @@ async def reblogged_by(
 
     viewer_id = viewer.account.id if (viewer and viewer.account) else None
     st = await _load_visible_status(session, status_id, viewer_id)
-    stmt = (
-        select(Account)
-        .join(Status, Status.account_id == Account.id)
-        .where(Status.reblog_of_id == st.id)
-    )
+    stmt = select(Account).join(Status, Status.account_id == Account.id).where(Status.reblog_of_id == st.id)
     if max_id is not None:
         stmt = stmt.where(Status.id < max_id)
     if since_id is not None:
@@ -578,7 +536,14 @@ async def translate_status(
 ) -> dict[str, Any]:
     """Translation stub — returns empty until translation service is ported."""
     await _load_visible_status(session, status_id, account.id)
-    return {"content": "", "spoiler_text": "", "poll": None, "media_attachments": [], "detected_source_language": None, "provider": None}
+    return {
+        "content": "",
+        "spoiler_text": "",
+        "poll": None,
+        "media_attachments": [],
+        "detected_source_language": None,
+        "provider": None,
+    }
 
 
 @router.get("/{status_id}/quotes", response_model=list[Any])
@@ -594,4 +559,3 @@ async def status_quotes(
     viewer_id = viewer.account.id if (viewer and viewer.account) else None
     await _load_visible_status(session, status_id, viewer_id)
     return []
-

@@ -62,9 +62,7 @@ class S3Storage:
 
         config = Config(request_checksum_calculation="when_required")
         session = aiobotocore.session.get_session()
-        async with session.create_client(
-            "s3", config=config, **self._client_kwargs()
-        ) as client:
+        async with session.create_client("s3", config=config, **self._client_kwargs()) as client:
             response = await client.get_object(Bucket=self._bucket, Key=key)
             async with response["Body"] as stream:
                 return await stream.read()
@@ -90,9 +88,7 @@ class S3Storage:
         # actually demands them.
         config = Config(request_checksum_calculation="when_required")
         session = aiobotocore.session.get_session()
-        async with session.create_client(
-            "s3", config=config, **self._client_kwargs()
-        ) as client:
+        async with session.create_client("s3", config=config, **self._client_kwargs()) as client:
             await client.put_object(**put_kwargs)
 
     def url(self, key: str) -> str:

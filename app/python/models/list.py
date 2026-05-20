@@ -46,9 +46,7 @@ class List(Base):
     __tablename__ = "lists"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False, default="")
     replies_policy: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     exclusive: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

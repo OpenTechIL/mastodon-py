@@ -56,9 +56,7 @@ class MediaAttachment(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     account_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    status_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("statuses.id"), nullable=True
-    )
+    status_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("statuses.id"), nullable=True)
     scheduled_status_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     type: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

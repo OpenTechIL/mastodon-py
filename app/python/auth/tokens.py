@@ -100,6 +100,4 @@ async def _stamp_last_used(
     values: dict[str, object] = {"last_used_at": now.replace(tzinfo=None)}
     if client_ip:
         values["last_used_ip"] = client_ip
-    await session.execute(
-        update(OAuthAccessToken).where(OAuthAccessToken.id == token_id).values(**values)
-    )
+    await session.execute(update(OAuthAccessToken).where(OAuthAccessToken.id == token_id).values(**values))

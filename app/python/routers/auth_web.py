@@ -32,6 +32,7 @@ _COOKIE_MAX_AGE = 60 * 60 * 24 * 14  # 2 weeks
 
 # ── cookie helpers ────────────────────────────────────────────────────────────
 
+
 def _sign(payload: str, secret: str) -> str:
     sig = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
     return f"{payload}.{sig}"
@@ -51,6 +52,7 @@ def _set_session(response: Response, user_id: int, account_id: int, token: str) 
     secret = get_settings().secret_key_base or "dev-secret"
     data = json.dumps({"user_id": user_id, "account_id": account_id, "token": token})
     import base64
+
     encoded = base64.urlsafe_b64encode(data.encode()).decode()
     signed = _sign(encoded, secret)
     response.set_cookie(
@@ -77,6 +79,7 @@ def get_session_data(request: Request) -> dict[str, Any] | None:
         return None
     try:
         import base64
+
         data = json.loads(base64.urlsafe_b64decode(payload.encode()).decode())
         return data
     except Exception:
@@ -84,6 +87,7 @@ def get_session_data(request: Request) -> dict[str, Any] | None:
 
 
 # ── HTML page helpers ─────────────────────────────────────────────────────────
+
 
 def _page(title: str, body: str) -> str:
     s = get_settings()
@@ -129,9 +133,12 @@ def _page(title: str, body: str) -> str:
 
 # ── sign in ───────────────────────────────────────────────────────────────────
 
+
 def _sign_in_form(error: str = "") -> str:
     err_html = f'<div class="error">{error}</div>' if error else ""
-    return _page("Sign in to Mastodon", f"""
+    return _page(
+        "Sign in to Mastodon",
+        f"""
     {err_html}
     <form method="post">
       <label for="email">Email or username</label>
@@ -143,7 +150,8 @@ def _sign_in_form(error: str = "") -> str:
     <div class="links">
       <a href="/auth/sign_up">Create account</a>
     </div>
-    """)
+    """,
+    )
 
 
 @router.get("/auth/sign_in", response_class=HTMLResponse)
@@ -202,6 +210,7 @@ async def sign_in_post(
             token = existing_token
         else:
             import secrets
+
             token = OAuthAccessToken(
                 id=now_id(),
                 token=secrets.token_hex(32),
@@ -226,6 +235,7 @@ async def sign_in_post(
 
 # ── sign out ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/auth/sign_out")
 @router.post("/auth/sign_out")
 async def sign_out() -> Response:
@@ -236,18 +246,21 @@ async def sign_out() -> Response:
 
 # ── sign up ───────────────────────────────────────────────────────────────────
 
+
 def _sign_up_form(error: str = "", values: dict | None = None) -> str:
     v = values or {}
     err_html = f'<div class="error">{error}</div>' if error else ""
-    return _page("Create account", f"""
+    return _page(
+        "Create account",
+        f"""
     {err_html}
     <form method="post">
       <label for="username">Username</label>
       <input type="text" id="username" name="username"
-             value="{v.get('username', '')}" autocomplete="username" autofocus/>
+             value="{v.get("username", "")}" autocomplete="username" autofocus/>
       <label for="email">Email</label>
       <input type="email" id="email" name="email"
-             value="{v.get('email', '')}" autocomplete="email"/>
+             value="{v.get("email", "")}" autocomplete="email"/>
       <label for="password">Password (min 8 chars)</label>
       <input type="password" id="password" name="password" autocomplete="new-password"/>
       <button type="submit" class="btn">Create account</button>
@@ -255,7 +268,8 @@ def _sign_up_form(error: str = "", values: dict | None = None) -> str:
     <div class="links">
       <a href="/auth/sign_in">Already have an account?</a>
     </div>
-    """)
+    """,
+    )
 
 
 @router.get("/auth/sign_up", response_class=HTMLResponse)
@@ -276,16 +290,12 @@ async def sign_up_post(
 
     async with session_factory()() as session:
         existing = (
-            await session.execute(
-                select(Account).where(Account.username == username, Account.domain.is_(None))
-            )
+            await session.execute(select(Account).where(Account.username == username, Account.domain.is_(None)))
         ).scalar_one_or_none()
         if existing:
             return HTMLResponse(_sign_up_form("Username is already taken.", values), status_code=422)
 
-        existing_user = (
-            await session.execute(select(User).where(User.email == email))
-        ).scalar_one_or_none()
+        existing_user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
         if existing_user:
             return HTMLResponse(_sign_up_form("Email is already in use.", values), status_code=422)
 
@@ -331,9 +341,7 @@ async def sign_up_post(
         )
         session.add(stat)
 
-        encrypted_password = bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt(12)
-        ).decode("utf-8")
+        encrypted_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(12)).decode("utf-8")
 
         user = User(
             id=now_id(),
@@ -352,6 +360,7 @@ async def sign_up_post(
         await session.flush()
 
         import secrets
+
         access_token = OAuthAccessToken(
             id=now_id(),
             token=secrets.token_hex(32),

@@ -37,15 +37,17 @@ def ensure_local_actor_keys(account: Account) -> None:
     if account.private_key:
         return  # already have a keypair; never regenerate
 
-    key = rsa.generate_private_key(
-        public_exponent=65537, key_size=_RSA_KEY_SIZE
-    )
+    key = rsa.generate_private_key(public_exponent=65537, key_size=_RSA_KEY_SIZE)
     account.private_key = key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
-    account.public_key = key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("utf-8")
+    account.public_key = (
+        key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )

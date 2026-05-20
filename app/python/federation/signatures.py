@@ -114,9 +114,7 @@ def _canonical_string(
             try:
                 value = _normalize_header_value(name, headers)
             except KeyError as exc:
-                raise ValueError(
-                    f"signed header {name!r} missing from request"
-                ) from exc
+                raise ValueError(f"signed header {name!r} missing from request") from exc
             lines.append(f"{name.lower()}: {value}")
     return "\n".join(lines)
 
@@ -147,9 +145,7 @@ def sign_request(
     method_upper = method.upper()
     is_body_method = method_upper in {"POST", "PUT", "PATCH"}
     if sign_headers is None:
-        sign_headers = (
-            DEFAULT_POST_HEADERS if is_body_method else DEFAULT_GET_HEADERS
-        )
+        sign_headers = DEFAULT_POST_HEADERS if is_body_method else DEFAULT_GET_HEADERS
 
     # Auto-populate the headers we control. Callers who want a custom
     # Date or Digest can set them before calling — we only fill gaps.
@@ -167,12 +163,7 @@ def sign_request(
     )
     sig_b64 = base64.b64encode(raw).decode("ascii")
     header_list = " ".join(h.lower() for h in sign_headers)
-    headers["Signature"] = (
-        f'keyId="{key_id}",'
-        f'algorithm="rsa-sha256",'
-        f'headers="{header_list}",'
-        f'signature="{sig_b64}"'
-    )
+    headers["Signature"] = f'keyId="{key_id}",algorithm="rsa-sha256",headers="{header_list}",signature="{sig_b64}"'
     return headers
 
 

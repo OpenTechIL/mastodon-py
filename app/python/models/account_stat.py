@@ -19,9 +19,7 @@ class AccountStat(Base):
     __tablename__ = "account_stats"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    account_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("accounts.id"), nullable=False, unique=True
-    )
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("accounts.id"), nullable=False, unique=True)
     statuses_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     following_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     followers_count: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)

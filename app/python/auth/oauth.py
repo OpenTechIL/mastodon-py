@@ -88,13 +88,9 @@ async def register_application(
     return row
 
 
-async def _resolve_client(
-    session: AsyncSession, client_id: str, client_secret: str
-) -> OAuthApplication:
+async def _resolve_client(session: AsyncSession, client_id: str, client_secret: str) -> OAuthApplication:
     row = (
-        await session.execute(
-            select(OAuthApplication).where(OAuthApplication.uid == client_id)
-        )
+        await session.execute(select(OAuthApplication).where(OAuthApplication.uid == client_id))
     ).scalar_one_or_none()
     if row is None or not secrets.compare_digest(row.secret, client_secret):
         raise InvalidClient
@@ -142,11 +138,7 @@ async def password_grant(
     """Password grant. Devise uses email as the login identifier."""
     app = await _resolve_client(session, client_id, client_secret)
 
-    user = (
-        await session.execute(
-            select(User).where(User.email == username).limit(1)
-        )
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.email == username).limit(1))).scalar_one_or_none()
     if user is None or not passwords.verify(password, user.encrypted_password):
         raise InvalidGrant
     if not user.functional:
@@ -206,9 +198,7 @@ async def revoke_token(
             return False
 
     row = (
-        await session.execute(
-            select(OAuthAccessToken).where(OAuthAccessToken.token == raw_token)
-        )
+        await session.execute(select(OAuthAccessToken).where(OAuthAccessToken.token == raw_token))
     ).scalar_one_or_none()
     if row is None:
         return True  # masquerade as success per RFC 7009

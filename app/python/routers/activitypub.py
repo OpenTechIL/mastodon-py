@@ -149,19 +149,14 @@ async def actor(username: str, request: Request, session: DBSession) -> Response
     the profile HTML page. AP clients receive application/activity+json.
     """
     row = (
-        await session.execute(
-            select(Account).where(
-                Account.username == username, Account.domain.is_(None)
-            )
-        )
+        await session.execute(select(Account).where(Account.username == username, Account.domain.is_(None)))
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     accept = request.headers.get("accept", "")
     if _wants_html(accept):
         from fastapi.responses import RedirectResponse
+
         return RedirectResponse(
             url=f"{_asset_host()}/@{row.username}",
             status_code=302,
@@ -172,9 +167,7 @@ async def actor(username: str, request: Request, session: DBSession) -> Response
     )
 
 
-async def _verify_or_401(
-    request: Request, session, http_client
-) -> tuple[bytes, str]:
+async def _verify_or_401(request: Request, session, http_client) -> tuple[bytes, str]:
     """Verify the signed POST. Raises 401 on failure; returns
     `(body, actor_url)` on success."""
     body = await request.body()
@@ -194,9 +187,7 @@ async def _verify_or_401(
     return body, actor_url
 
 
-async def _dispatch_body(
-    session, http_client, enqueuer, actor_url: str, body: bytes
-) -> None:
+async def _dispatch_body(session, http_client, enqueuer, actor_url: str, body: bytes) -> None:
     """Parse the verified body and route to a handler. Bad JSON is a
     no-op — the inbox already returned 202 conceptually."""
     try:
@@ -235,16 +226,10 @@ CollectionKind = Literal["followers", "following"]
 
 async def _load_local_actor(session, username: str) -> Account:
     row = (
-        await session.execute(
-            select(Account).where(
-                Account.username == username, Account.domain.is_(None)
-            )
-        )
+        await session.execute(select(Account).where(Account.username == username, Account.domain.is_(None)))
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return row
 
 
@@ -254,19 +239,13 @@ def _collection_endpoint(account: Account, kind: CollectionKind) -> str:
 
 async def _count(session, account: Account, kind: CollectionKind) -> int:
     if kind == "followers":
-        stmt = select(func.count()).select_from(Follow).where(
-            Follow.target_account_id == account.id
-        )
+        stmt = select(func.count()).select_from(Follow).where(Follow.target_account_id == account.id)
     else:
-        stmt = select(func.count()).select_from(Follow).where(
-            Follow.account_id == account.id
-        )
+        stmt = select(func.count()).select_from(Follow).where(Follow.account_id == account.id)
     return int((await session.execute(stmt)).scalar_one())
 
 
-async def _page_items(
-    session, account: Account, kind: CollectionKind, *, page: int
-) -> list[str]:
+async def _page_items(session, account: Account, kind: CollectionKind, *, page: int) -> list[str]:
     """Return the actor URIs on `page` (1-indexed) for the collection.
 
     Locals get a synthesized URI via `account_uri`; remotes use their
@@ -296,9 +275,7 @@ async def _page_items(
     return [account_uri(a) for a in rows]
 
 
-def _collection_root(
-    account: Account, kind: CollectionKind, *, total: int
-) -> dict:
+def _collection_root(account: Account, kind: CollectionKind, *, total: int) -> dict:
     endpoint = _collection_endpoint(account, kind)
     return {
         "@context": _AS2_CONTEXT,
@@ -335,9 +312,7 @@ def _collection_page(
     return body
 
 
-async def _serve_collection(
-    session, username: str, kind: CollectionKind, page: str | None
-) -> Response:
+async def _serve_collection(session, username: str, kind: CollectionKind, page: str | None) -> Response:
     account = await _load_local_actor(session, username)
     # `hide_collections` privacy switch: emit a zero-count root, no
     # paginated items. Peers see the collection exists but can't
@@ -357,9 +332,7 @@ async def _serve_collection(
             page_num = 1
         page_num = max(1, page_num)
         items = await _page_items(session, account, kind, page=page_num)
-        body = _collection_page(
-            account, kind, total=total, page=page_num, items=items
-        )
+        body = _collection_page(account, kind, total=total, page=page_num, items=items)
     return Response(content=json.dumps(body), media_type=_AP_MEDIA_TYPE)
 
 
@@ -370,18 +343,20 @@ _OUTBOX_VISIBILITIES = (Visibility.PUBLIC.value, Visibility.UNLISTED.value)
 
 
 async def _outbox_count(session, account: Account) -> int:
-    stmt = select(func.count()).select_from(Status).where(
-        Status.account_id == account.id,
-        Status.visibility.in_(_OUTBOX_VISIBILITIES),
-        Status.deleted_at.is_(None),
-        Status.reblog_of_id.is_(None),
+    stmt = (
+        select(func.count())
+        .select_from(Status)
+        .where(
+            Status.account_id == account.id,
+            Status.visibility.in_(_OUTBOX_VISIBILITIES),
+            Status.deleted_at.is_(None),
+            Status.reblog_of_id.is_(None),
+        )
     )
     return int((await session.execute(stmt)).scalar_one())
 
 
-async def _outbox_page_items(
-    session, account: Account, *, page: int
-) -> list[dict]:
+async def _outbox_page_items(session, account: Account, *, page: int) -> list[dict]:
     offset = max(0, (page - 1) * _PAGE_SIZE)
     stmt = (
         select(Status)
@@ -498,9 +473,7 @@ async def following_collection(
     return await _serve_collection(session, username, "following", page)
 
 
-@router.post(
-    "/users/{username}/inbox", status_code=status.HTTP_202_ACCEPTED
-)
+@router.post("/users/{username}/inbox", status_code=status.HTTP_202_ACCEPTED)
 async def actor_inbox(
     username: str,
     request: Request,
@@ -511,16 +484,10 @@ async def actor_inbox(
     # The username path segment must resolve to a local actor — we
     # don't accept federated POSTs against URLs we don't own.
     row = (
-        await session.execute(
-            select(Account).where(
-                Account.username == username, Account.domain.is_(None)
-            )
-        )
+        await session.execute(select(Account).where(Account.username == username, Account.domain.is_(None)))
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND, detail="Record not found"
-        )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     body, actor_url = await _verify_or_401(request, session, http_client)
     await _dispatch_body(session, http_client, enqueuer, actor_url, body)
     return Response(status_code=status.HTTP_202_ACCEPTED)

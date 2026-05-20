@@ -17,17 +17,11 @@ from app.python.schemas.poll import Poll_, serialize_poll
 router = APIRouter(prefix="/api/v1/polls", tags=["polls"])
 
 
-async def _load_visible_poll(
-    session, poll_id: int, viewer_account_id: int | None
-) -> Poll:
-    poll = (
-        await session.execute(select(Poll).where(Poll.id == poll_id))
-    ).scalar_one_or_none()
+async def _load_visible_poll(session, poll_id: int, viewer_account_id: int | None) -> Poll:
+    poll = (await session.execute(select(Poll).where(Poll.id == poll_id))).scalar_one_or_none()
     if poll is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
-    parent = (
-        await session.execute(select(Status).where(Status.id == poll.status_id))
-    ).scalar_one_or_none()
+    parent = (await session.execute(select(Status).where(Status.id == poll.status_id))).scalar_one_or_none()
     if parent is None or not await visible_to(session, parent, viewer_account_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return poll
@@ -61,26 +55,18 @@ async def vote(
     poll = await _load_visible_poll(session, poll_id, voter.id)
 
     if poll.expired:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="The poll has already ended"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="The poll has already ended")
     if not body.choices:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="choices is required"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="choices is required")
     if not poll.multiple and len(body.choices) > 1:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="This poll only allows one choice",
         )
     if any(c < 0 or c >= len(poll.options) for c in body.choices):
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid choice index"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid choice index")
     if len(set(body.choices)) != len(body.choices):
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Duplicate choices"
-        )
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Duplicate choices")
 
     existing_choices = await _own_votes(session, poll.id, voter.id)
     if existing_choices:
@@ -123,17 +109,19 @@ async def vote(
     )
 
 
-async def _own_votes(
-    session, poll_id: int, viewer_account_id: int | None
-) -> list[int]:
+async def _own_votes(session, poll_id: int, viewer_account_id: int | None) -> list[int]:
     if viewer_account_id is None:
         return []
     rows = (
-        await session.execute(
-            select(PollVote.choice).where(
-                PollVote.poll_id == poll_id,
-                PollVote.account_id == viewer_account_id,
+        (
+            await session.execute(
+                select(PollVote.choice).where(
+                    PollVote.poll_id == poll_id,
+                    PollVote.account_id == viewer_account_id,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return sorted(rows)

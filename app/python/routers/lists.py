@@ -58,9 +58,7 @@ async def create(
             exclusive=body.exclusive,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     return serialize_list(row)
 
 
@@ -96,9 +94,7 @@ async def update(
     except list_service.ListNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     except ValueError as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
-        ) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
     return serialize_list(row)
 
 
@@ -122,9 +118,7 @@ async def members(
     viewer: CurrentAccount,
 ) -> list[Account_]:
     try:
-        accounts = await list_service.list_members(
-            session, owner=viewer, list_id=list_id
-        )
+        accounts = await list_service.list_members(session, owner=viewer, list_id=list_id)
     except list_service.ListNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     return [serialize_account(a) for a in accounts]
@@ -138,9 +132,7 @@ async def add_members(
     viewer: CurrentAccount,
 ) -> dict[str, object]:
     try:
-        await list_service.add_accounts(
-            session, owner=viewer, list_id=list_id, account_ids=body.account_ids
-        )
+        await list_service.add_accounts(session, owner=viewer, list_id=list_id, account_ids=body.account_ids)
     except list_service.ListNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     return {}
@@ -154,9 +146,7 @@ async def remove_members(
     viewer: CurrentAccount,
 ) -> dict[str, object]:
     try:
-        await list_service.remove_accounts(
-            session, owner=viewer, list_id=list_id, account_ids=body.account_ids
-        )
+        await list_service.remove_accounts(session, owner=viewer, list_id=list_id, account_ids=body.account_ids)
     except list_service.ListNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
     return {}
@@ -196,7 +186,5 @@ async def list_timeline(
     if link:
         response.headers["Link"] = link
 
-    relationships = await load_relationships(
-        session, viewer.id, status_ids_for_batch(ordered)
-    )
+    relationships = await load_relationships(session, viewer.id, status_ids_for_batch(ordered))
     return [serialize_status(row, relationships=relationships) for row in ordered]

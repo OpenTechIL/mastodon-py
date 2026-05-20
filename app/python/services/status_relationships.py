@@ -84,9 +84,7 @@ async def load_relationships(
     mentions_by_status = await _load_mentions(session, ids)
     media_by_status = await _load_media(session, ids)
     poll_by_status, poll_ids = await _load_polls(session, ids)
-    own_poll_votes = await _load_own_poll_votes(
-        session, poll_ids, viewer_account_id
-    )
+    own_poll_votes = await _load_own_poll_votes(session, poll_ids, viewer_account_id)
 
     if not ids or viewer_account_id is None:
         return StatusRelationships(
@@ -97,38 +95,54 @@ async def load_relationships(
         )
 
     favs = (
-        await session.execute(
-            select(Favourite.status_id).where(
-                Favourite.account_id == viewer_account_id,
-                Favourite.status_id.in_(ids),
+        (
+            await session.execute(
+                select(Favourite.status_id).where(
+                    Favourite.account_id == viewer_account_id,
+                    Favourite.status_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     marks = (
-        await session.execute(
-            select(Bookmark.status_id).where(
-                Bookmark.account_id == viewer_account_id,
-                Bookmark.status_id.in_(ids),
+        (
+            await session.execute(
+                select(Bookmark.status_id).where(
+                    Bookmark.account_id == viewer_account_id,
+                    Bookmark.status_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     rebs = (
-        await session.execute(
-            select(Status.reblog_of_id).where(
-                Status.account_id == viewer_account_id,
-                Status.reblog_of_id.in_(ids),
-                Status.deleted_at.is_(None),
+        (
+            await session.execute(
+                select(Status.reblog_of_id).where(
+                    Status.account_id == viewer_account_id,
+                    Status.reblog_of_id.in_(ids),
+                    Status.deleted_at.is_(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     pins = (
-        await session.execute(
-            select(StatusPin.status_id).where(
-                StatusPin.account_id == viewer_account_id,
-                StatusPin.status_id.in_(ids),
+        (
+            await session.execute(
+                select(StatusPin.status_id).where(
+                    StatusPin.account_id == viewer_account_id,
+                    StatusPin.status_id.in_(ids),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return StatusRelationships(
         favourited_ids=set(favs),
         bookmarked_ids=set(marks),
@@ -141,16 +155,10 @@ async def load_relationships(
     )
 
 
-async def _load_polls(
-    session: AsyncSession, status_ids: list[int]
-) -> tuple[dict[int, Poll], list[int]]:
+async def _load_polls(session: AsyncSession, status_ids: list[int]) -> tuple[dict[int, Poll], list[int]]:
     if not status_ids:
         return {}, []
-    rows = (
-        await session.execute(
-            select(Poll).where(Poll.status_id.in_(status_ids))
-        )
-    ).scalars().all()
+    rows = (await session.execute(select(Poll).where(Poll.status_id.in_(status_ids)))).scalars().all()
     out = {row.status_id: row for row in rows}
     return out, [row.id for row in rows]
 
@@ -178,18 +186,20 @@ async def _load_own_poll_votes(
     return out
 
 
-async def _load_media(
-    session: AsyncSession, status_ids: list[int]
-) -> dict[int, list[MediaAttachment]]:
+async def _load_media(session: AsyncSession, status_ids: list[int]) -> dict[int, list[MediaAttachment]]:
     if not status_ids:
         return {}
     rows = (
-        await session.execute(
-            select(MediaAttachment)
-            .where(MediaAttachment.status_id.in_(status_ids))
-            .order_by(MediaAttachment.id.asc())
+        (
+            await session.execute(
+                select(MediaAttachment)
+                .where(MediaAttachment.status_id.in_(status_ids))
+                .order_by(MediaAttachment.id.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     out: dict[int, list[MediaAttachment]] = {}
     for row in rows:
         if row.status_id is None:
@@ -198,9 +208,7 @@ async def _load_media(
     return out
 
 
-async def _load_mentions(
-    session: AsyncSession, status_ids: list[int]
-) -> dict[int, list[MentionEntry]]:
+async def _load_mentions(session: AsyncSession, status_ids: list[int]) -> dict[int, list[MentionEntry]]:
     if not status_ids:
         return {}
     rows = (
@@ -226,9 +234,7 @@ async def _load_mentions(
             href = f"https://{domain}/@{username}"
         else:
             href = f"/@{username}"
-        out.setdefault(sid, []).append(
-            MentionEntry(id=str(aid), username=username, acct=acct, url=href)
-        )
+        out.setdefault(sid, []).append(MentionEntry(id=str(aid), username=username, acct=acct, url=href))
     return out
 
 

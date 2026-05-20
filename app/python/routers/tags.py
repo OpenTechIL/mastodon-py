@@ -31,11 +31,7 @@ router = APIRouter(tags=["tags"])
 async def _resolve_tag(session, name: str) -> Tag:
     """Case-insensitive lookup. The schema's unique index is on `lower(name)`
     so `func.lower(Tag.name)` hits the index in production."""
-    row = (
-        await session.execute(
-            select(Tag).where(func.lower(Tag.name) == name.lower()).limit(1)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(Tag).where(func.lower(Tag.name) == name.lower()).limit(1))).scalar_one_or_none()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     return row
@@ -44,9 +40,7 @@ async def _resolve_tag(session, name: str) -> Tag:
 async def _is_following(session, account_id: int, tag_id: int) -> bool:
     return (
         await session.execute(
-            select(TagFollow.id)
-            .where(TagFollow.account_id == account_id, TagFollow.tag_id == tag_id)
-            .limit(1)
+            select(TagFollow.id).where(TagFollow.account_id == account_id, TagFollow.tag_id == tag_id).limit(1)
         )
     ).scalar_one_or_none() is not None
 
@@ -58,11 +52,7 @@ async def show(
     auth: OptionalAuth,
 ) -> Tag_:
     tag = await _resolve_tag(session, name)
-    following = (
-        await _is_following(session, auth.account.id, tag.id)
-        if auth and auth.account
-        else False
-    )
+    following = await _is_following(session, auth.account.id, tag.id) if auth and auth.account else False
     return serialize_tag(tag, following=following)
 
 
@@ -74,11 +64,7 @@ async def follow_tag(
 ) -> Tag_:
     tag = await _resolve_tag(session, name)
     existing = (
-        await session.execute(
-            select(TagFollow).where(
-                TagFollow.account_id == viewer.id, TagFollow.tag_id == tag.id
-            )
-        )
+        await session.execute(select(TagFollow).where(TagFollow.account_id == viewer.id, TagFollow.tag_id == tag.id))
     ).scalar_one_or_none()
     if existing is None:
         now = datetime.now(tz=UTC).replace(tzinfo=None)
@@ -104,11 +90,7 @@ async def unfollow_tag(
     tag = await _resolve_tag(session, name)
     from sqlalchemy import delete
 
-    await session.execute(
-        delete(TagFollow).where(
-            TagFollow.account_id == viewer.id, TagFollow.tag_id == tag.id
-        )
-    )
+    await session.execute(delete(TagFollow).where(TagFollow.account_id == viewer.id, TagFollow.tag_id == tag.id))
     await session.commit()
     return serialize_tag(tag, following=False)
 
@@ -122,9 +104,7 @@ async def feature_tag(
     tag = await _resolve_tag(session, name)
     existing = (
         await session.execute(
-            select(FeaturedTag).where(
-                FeaturedTag.account_id == viewer.id, FeaturedTag.tag_id == tag.id
-            )
+            select(FeaturedTag).where(FeaturedTag.account_id == viewer.id, FeaturedTag.tag_id == tag.id)
         )
     ).scalar_one_or_none()
     if existing is None:
@@ -153,12 +133,9 @@ async def unfeature_tag(
     viewer: CurrentAccount,
 ) -> Tag_:
     from sqlalchemy import delete
+
     tag = await _resolve_tag(session, name)
-    await session.execute(
-        delete(FeaturedTag).where(
-            FeaturedTag.account_id == viewer.id, FeaturedTag.tag_id == tag.id
-        )
-    )
+    await session.execute(delete(FeaturedTag).where(FeaturedTag.account_id == viewer.id, FeaturedTag.tag_id == tag.id))
     await session.commit()
     following = await _is_following(session, viewer.id, tag.id)
     return serialize_tag(tag, following=following)
@@ -174,9 +151,7 @@ async def tag_timeline(
     params: Annotated[PageParams, Depends(page_params)],
 ) -> list[Status_]:
     tag = (
-        await session.execute(
-            select(Tag).where(func.lower(Tag.name) == hashtag.lower()).limit(1)
-        )
+        await session.execute(select(Tag).where(func.lower(Tag.name) == hashtag.lower()).limit(1))
     ).scalar_one_or_none()
     if tag is None:
         return []
@@ -207,9 +182,7 @@ async def tag_timeline(
     if link:
         response.headers["Link"] = link
 
-    relationships = await load_relationships(
-        session, viewer_account_id, status_ids_for_batch(ordered)
-    )
+    relationships = await load_relationships(session, viewer_account_id, status_ids_for_batch(ordered))
     return [serialize_status(s, relationships=relationships) for s in ordered]
 
 

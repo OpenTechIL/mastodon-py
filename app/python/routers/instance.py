@@ -269,6 +269,52 @@ async def instance_peers(session: DBSession) -> list[str]:
     return sorted(d for d in rows if d)
 
 
+@router.get("/api/v1/instance/languages", response_model=list[dict[str, str]])
+async def instance_languages() -> list[dict[str, str]]:
+    """List of languages supported by this instance (ISO 639-1 codes + names)."""
+    return [
+        {"code": code, "name": name}
+        for code, name in _SUPPORTED_LANGUAGES.items()
+    ]
+
+
+_SUPPORTED_LANGUAGES = {
+    "ar": "العربية", "ast": "Asturianu", "bg": "Български", "bn": "বাংলা",
+    "ca": "Català", "co": "Corsu", "cs": "Čeština", "cy": "Cymraeg",
+    "da": "Dansk", "de": "Deutsch", "el": "Ελληνικά", "en": "English",
+    "eo": "Esperanto", "es": "Español", "et": "Eesti", "eu": "Euskara",
+    "fa": "فارسی", "fi": "Suomi", "fr": "Français", "ga": "Gaeilge",
+    "gl": "Galego", "he": "עברית", "hr": "Hrvatski", "hu": "Magyar",
+    "hy": "Հայերեն", "id": "Bahasa Indonesia", "io": "Ido", "is": "Íslenska",
+    "it": "Italiano", "ja": "日本語", "ka": "ქართული", "kk": "Қазақша",
+    "kn": "ಕನ್ನಡ", "ko": "한국어", "ku": "Kurdî", "lt": "Lietuvių",
+    "lv": "Latviešu", "mk": "Македонски", "ml": "മലയാളം", "mr": "मराठी",
+    "ms": "Bahasa Melayu", "nl": "Nederlands", "nn": "Nynorsk", "no": "Norsk",
+    "oc": "Occitan", "pl": "Polski", "pt": "Português", "pt-BR": "Português (Brasil)",
+    "ro": "Română", "ru": "Русский", "sk": "Slovenčina", "sl": "Slovenščina",
+    "sq": "Shqip", "sr": "Српски", "sv": "Svenska", "ta": "தமிழ்",
+    "te": "తెలుగు", "th": "ภาษาไทย", "tr": "Türkçe", "uk": "Українська",
+    "ur": "اردو", "vi": "Tiếng Việt", "zh-CN": "中文(简体)", "zh-HK": "中文(香港)",
+    "zh-TW": "中文(繁體)",
+}
+
+
+@router.get("/api/v1/peers/search", response_model=list[str])
+async def peers_search(session: DBSession, q: str = "") -> list[str]:
+    """Search federated peers by domain prefix."""
+    if not q:
+        return []
+    prefix = q.lower().strip()
+    rows = (
+        await session.execute(
+            select(distinct(Account.domain))
+            .where(Account.domain.is_not(None), Account.domain.ilike(f"{prefix}%"))
+            .limit(10)
+        )
+    ).scalars().all()
+    return sorted(d for d in rows if d)
+
+
 @router.get("/api/v1/instance/extended_description")
 async def instance_extended_description() -> dict[str, Any]:
     return {"updated_at": None, "content": ""}

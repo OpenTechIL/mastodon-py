@@ -17,7 +17,9 @@ import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter
+import re
+
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import distinct, func, select
 
@@ -605,3 +607,50 @@ async def read_annual_report(year: int, account: CurrentAccount) -> dict[str, An
 @router.post("/api/v1/annual_reports/{year}/generate", status_code=200)
 async def generate_annual_report(year: int, account: CurrentAccount) -> dict[str, Any]:
     return {}
+
+
+# ── /api/oembed ──────────────────────────────────────────────────────────────
+
+_STATUS_URL_RE = re.compile(r"/(?:@[^/]+|users/[^/]+/statuses)/(\d+)")
+
+
+@router.get("/api/oembed")
+async def oembed(
+    session: DBSession,
+    url: str = Query(default=""),
+) -> dict[str, Any]:
+    """Return oEmbed JSON for a public status URL."""
+    if not url:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="url is required")
+    m = _STATUS_URL_RE.search(url)
+    if not m:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not found")
+    status_id = int(m.group(1))
+    row = (
+        await session.execute(select(Status).where(Status.id == status_id, Status.deleted_at.is_(None)))
+    ).scalar_one_or_none()
+    if row is None or row.visibility not in {0, 1}:  # PUBLIC or UNLISTED
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not found")
+    s = get_settings()
+    base = s.base_url()
+    account: Account = row.account
+    from app.python.lib.asset_urls import avatar_url as _avatar_url
+
+    return {
+        "type": "rich",
+        "version": "1.0",
+        "title": f"Post by @{account.acct}",
+        "author_name": account.display_name or account.username,
+        "author_url": f"{base}/@{account.acct}",
+        "provider_name": s.effective_web_domain,
+        "provider_url": base,
+        "thumbnail_url": _avatar_url(account),
+        "html": (
+            f'<iframe src="{base}/@{account.acct}/{row.id}/embed" '
+            f'width="400" height="200" allowfullscreen="allowfullscreen" '
+            f'sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms">'
+            f"</iframe>"
+        ),
+        "width": 400,
+        "height": None,
+    }

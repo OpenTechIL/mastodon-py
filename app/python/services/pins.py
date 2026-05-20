@@ -15,15 +15,15 @@ side of pin/unpin; deferred to the federation phase.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.python.common.snowflake import now_id
 from app.python.models import Account, Status, StatusPin, Visibility
-
 
 MAX_PINNED_STATUSES = 5
 
@@ -80,7 +80,7 @@ async def pin(
     if count >= MAX_PINNED_STATUSES:
         raise TooManyPins()
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = StatusPin(
         id=now_id(),
         account_id=author.id,

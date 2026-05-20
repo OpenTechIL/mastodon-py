@@ -31,7 +31,7 @@ class Application(BaseModel):
         return get_settings().vapid_public_key
 
     @classmethod
-    def from_model(cls, app: OAuthApplication) -> "Application":
+    def from_model(cls, app: OAuthApplication) -> Application:
         return cls(
             id=str(app.id),
             name=app.name,

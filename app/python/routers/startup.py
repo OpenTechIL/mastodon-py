@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Query
@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.python.common.snowflake import now_id
 from app.python.deps import CurrentUser, DBSession
-from app.python.lib.asset_urls import _asset_host  # noqa: PLC2701
+from app.python.lib.asset_urls import _asset_host
 from app.python.models import CustomEmoji, Marker
 
 router = APIRouter(tags=["startup"])
@@ -119,7 +119,7 @@ async def markers_upsert(
     `lock_version` on each write.
     """
     out: dict[str, Marker_] = {}
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     for timeline, payload in body.items():
         if timeline not in _ALLOWED_MARKER_TIMELINES:
             continue

@@ -6,7 +6,7 @@ web/push_subscriptions — stub; web push requires VAPID keys not yet configured
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Response, status
@@ -57,7 +57,7 @@ async def update_web_settings(
         await session.execute(select(WebSetting).where(WebSetting.user_id == user.id))
     ).scalar_one_or_none()
     data = body.data if body else {}
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     if row is None:
         row = WebSetting(user_id=user.id, data=data or {}, created_at=now, updated_at=now)
         session.add(row)

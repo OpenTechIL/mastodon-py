@@ -26,7 +26,7 @@ Deferred:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,7 +70,7 @@ async def update_status(
     if _unchanged(status, update):
         return status
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
 
     # Snapshot the pre-edit state.
     snapshot = StatusEdit(

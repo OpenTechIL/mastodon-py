@@ -35,10 +35,10 @@ from __future__ import annotations
 import base64
 import hashlib
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import format_datetime
-from typing import Mapping
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -47,7 +47,6 @@ from cryptography.hazmat.primitives.asymmetric.rsa import (
     RSAPrivateKey,
     RSAPublicKey,
 )
-
 
 # Default header set Mastodon signs. Inbox POSTs include digest +
 # content-type; GETs (e.g. fetching an actor) omit those.
@@ -82,7 +81,7 @@ def _digest(body: bytes) -> str:
 
 def _http_date(now: datetime | None = None) -> str:
     """RFC 7231 IMF-fixdate, e.g. `Sun, 01 Jan 2026 00:00:00 GMT`."""
-    when = now or datetime.now(tz=timezone.utc)
+    when = now or datetime.now(tz=UTC)
     return format_datetime(when, usegmt=True)
 
 

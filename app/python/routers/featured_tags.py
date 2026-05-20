@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -11,7 +11,7 @@ from sqlalchemy import delete, func, select
 
 from app.python.common.snowflake import now_id
 from app.python.deps import CurrentAccount, DBSession
-from app.python.lib.asset_urls import _asset_host  # noqa: PLC2701
+from app.python.lib.asset_urls import _asset_host
 from app.python.models import Account, FeaturedTag, StatusTag, Tag
 
 router = APIRouter(tags=["featured_tags"])
@@ -148,7 +148,7 @@ async def create(
     statuses_count = int(counts_row[0] or 0)
     last_status_at = counts_row[1]
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = FeaturedTag(
         id=now_id(),
         account_id=viewer.id,
@@ -205,7 +205,7 @@ async def featured_tag_suggestions(
 ) -> list[Any]:
     """Return hashtags the current user has used recently as suggestions
     for featured tags. Returns top 10 by recent usage."""
-    from app.python.models import StatusTag, Tag, Status
+    from app.python.models import Status, StatusTag, Tag
 
     rows = (
         await session.execute(

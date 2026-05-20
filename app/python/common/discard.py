@@ -9,7 +9,7 @@ this module is designed to avoid.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Select
@@ -25,11 +25,11 @@ class Discardable:
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     @classmethod
-    def kept_clause(cls) -> "ColumnElement[bool]":
+    def kept_clause(cls) -> ColumnElement[bool]:
         return cls.deleted_at.is_(None)
 
     @classmethod
-    def discarded_clause(cls) -> "ColumnElement[bool]":
+    def discarded_clause(cls) -> ColumnElement[bool]:
         return cls.deleted_at.is_not(None)
 
     @classmethod
@@ -46,7 +46,7 @@ class Discardable:
 
     def discard(self) -> None:
         if self.deleted_at is None:
-            self.deleted_at = datetime.now(tz=timezone.utc)
+            self.deleted_at = datetime.now(tz=UTC)
 
     def undiscard(self) -> None:
         self.deleted_at = None

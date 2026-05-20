@@ -13,8 +13,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 from app.python.db import Base
 
@@ -79,7 +79,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
 
-    account: Mapped["Account"] = relationship(  # type: ignore[name-defined]
+    account: Mapped[Account] = relationship(  # type: ignore[name-defined]
         "Account",
         back_populates="user",
         uselist=False,

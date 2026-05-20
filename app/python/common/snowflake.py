@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import secrets
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def id_at(timestamp: datetime, *, with_random: bool = True) -> int:
@@ -44,7 +44,7 @@ def id_at(timestamp: datetime, *, with_random: bool = True) -> int:
     sort by their tail rather than by sub-millisecond clock drift.
     """
     if timestamp.tzinfo is None:
-        timestamp = timestamp.replace(tzinfo=timezone.utc)
+        timestamp = timestamp.replace(tzinfo=UTC)
 
     seconds = int(timestamp.timestamp())
     value = seconds * 1000
@@ -63,7 +63,7 @@ def to_time(snowflake_id: int) -> datetime:
     whole seconds, matching what `id_at` encodes.
     """
     seconds = (snowflake_id >> 16) // 1000
-    return datetime.fromtimestamp(seconds, tz=timezone.utc)
+    return datetime.fromtimestamp(seconds, tz=UTC)
 
 
 _monotonic_lock = threading.Lock()
@@ -83,7 +83,7 @@ def now_id() -> int:
     """
     global _last_minted_id
     with _monotonic_lock:
-        candidate = id_at(datetime.now(tz=timezone.utc))
+        candidate = id_at(datetime.now(tz=UTC))
         if candidate <= _last_minted_id:
             candidate = _last_minted_id + 1
         _last_minted_id = candidate

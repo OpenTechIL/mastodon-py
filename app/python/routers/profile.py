@@ -16,8 +16,8 @@ from fastapi import APIRouter, Request, status
 from sqlalchemy import select
 
 from app.python.deps import CurrentAccount, DBSession
-from app.python.models import Account, FeaturedTag, Tag
 from app.python.lib.asset_urls import avatar_url, header_url
+from app.python.models import Account, FeaturedTag, Tag
 
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
@@ -101,7 +101,7 @@ async def _apply_text_fields(account: Account, data: dict[str, Any]) -> None:
 
 
 async def _save_image(account: Account, kind: str, file_bytes: bytes, content_type: str, filename: str) -> None:
-    from app.python.storage import get_storage  # noqa: PLC0415
+    from app.python.storage import get_storage
     ext = os.path.splitext(filename)[1] or ".jpg"
     fname = f"original{ext}"
     storage_dir = "avatars" if kind == "avatar" else "headers"

@@ -20,9 +20,9 @@ serializer's AR lazy-load chain; ours is explicit.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Iterable
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,7 +83,7 @@ async def load_filters_for(
 ) -> list[FilterCheck]:
     if viewer_account_id is None:
         return []
-    now = now or datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = now or datetime.now(tz=UTC).replace(tzinfo=None)
 
     filters = (
         await session.execute(

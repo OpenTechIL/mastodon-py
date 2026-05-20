@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -81,7 +81,7 @@ async def follow_tag(
         )
     ).scalar_one_or_none()
     if existing is None:
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         session.add(
             TagFollow(
                 id=now_id(),

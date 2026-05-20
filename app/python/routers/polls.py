@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -90,7 +89,7 @@ async def vote(
             detail="You have already voted on this poll",
         )
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     # Bump in-memory tallies under the row's lock_version. Replace the
     # array wholesale so SQLAlchemy detects the change on JSON/ARRAY
     # columns (it doesn't track in-place mutations of mutable types

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import secrets
+from datetime import UTC, datetime
 from typing import Annotated
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from sqlalchemy import or_, select
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import delete, or_, select
 
+from app.python.auth.oauth import _resolve_client
 from app.python.common.pagination import (
     PageParams,
     apply_pagination,
@@ -14,31 +19,25 @@ from app.python.common.pagination import (
     maybe_reverse,
     page_params,
 )
-from app.python.deps import CurrentAccount, DBSession, OptionalAuth
 from app.python.common.snowflake import now_id
+from app.python.deps import CurrentAccount, DBSession, OptionalAuth
 from app.python.models import (
     Account,
     AccountNote,
     AccountPin,
     Follow,
+    OAuthAccessToken,
     Status,
     StatusPin,
+    User,
     Visibility,
 )
-from datetime import datetime, timezone
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete
-from app.python.policies.status_policy import _follows  # noqa: PLC2701
+from app.python.models.account_stat import AccountStat
+from app.python.policies.status_policy import _follows
+from app.python.queue import Enqueuer, get_enqueuer
 from app.python.schemas.account import Account_, serialize_account
 from app.python.schemas.relationship import Relationship, serialize_relationship
 from app.python.schemas.status import Status_, serialize_status
-import bcrypt
-import secrets
-
-from app.python.auth.oauth import _resolve_client  # noqa: PLC2701
-from app.python.models import OAuthAccessToken, User
-from app.python.models.account_stat import AccountStat
-from app.python.queue import Enqueuer, get_enqueuer
 from app.python.services import blocks as block_service
 from app.python.services import follows as follow_service
 from app.python.services import mutes as mute_service
@@ -73,8 +72,6 @@ async def register(
     Requires client_credentials in query or header. In open-registration
     mode (the current default) the account is immediately confirmed.
     """
-    from fastapi import Request as _Request  # noqa: PLC0415
-    from fastapi.security.utils import get_authorization_scheme_param  # noqa: PLC0415
 
     # Validate required fields
     if not body.username or not body.email or not body.password:
@@ -102,7 +99,7 @@ async def register(
         raise HTTPException(status_code=422, detail={"error": "Email is already in use"})
 
     settings = get_settings()
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     domain = settings.local_domain
 
     account = Account(
@@ -241,8 +238,9 @@ def _coerce_bool(v: object) -> bool | None:
 
 
 async def _save_account_image(account: object, kind: str, file_bytes: bytes, content_type: str, filename: str) -> None:
-    import os as _os  # noqa: PLC0415
-    from app.python.storage import get_storage  # noqa: PLC0415
+    import os as _os
+
+    from app.python.storage import get_storage
     ext = _os.path.splitext(filename)[1] or ".jpg"
     fname = f"original{ext}"
     storage_dir = "avatars" if kind == "avatar" else "headers"
@@ -311,12 +309,12 @@ async def update_credentials(
                         getattr(file_field, "filename", None) or f"{kind}.jpg",
                     )
     else:
-        import json as _json  # noqa: PLC0415
+        import json as _json
         body = await request.body()
         data = _json.loads(body) if body else {}
         await _apply_credentials_data(account, data)
 
-    account.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    account.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await session.commit()
     return serialize_account(account)
 
@@ -328,7 +326,7 @@ async def search(
     q: str = Query(default=""),
     limit: int = Query(default=40, ge=1, le=80),
     following: bool = Query(default=False),
-    resolve: bool = Query(default=False),  # noqa: ARG001 — webfinger deferred
+    resolve: bool = Query(default=False),
 ) -> list[Account_]:
     """Substring search on username + display_name.
 
@@ -595,7 +593,7 @@ async def set_note(
                 )
             )
         ).scalar_one_or_none()
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         if existing is None:
             session.add(
                 AccountNote(
@@ -654,7 +652,7 @@ async def pin_account(
         )
     ).scalar_one_or_none()
     if existing is None:
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         session.add(
             AccountPin(
                 id=now_id(),
@@ -702,6 +700,22 @@ async def unfollow(
     return serialize_relationship(account_id, rels)
 
 
+@router.post("/{account_id}/remove_from_followers", response_model=Relationship)
+async def remove_from_followers(
+    account_id: int,
+    session: DBSession,
+    viewer: CurrentAccount,
+    enqueuer: Enqueuer = Depends(get_enqueuer),
+) -> Relationship:
+    """Remove the given account from the viewer's followers list."""
+    follower = await _load_target(session, account_id)
+    await follow_service.unfollow(
+        session, source=follower, target=viewer, enqueuer=enqueuer
+    )
+    rels = await load_account_relationships(session, viewer.id, [account_id])
+    return serialize_relationship(account_id, rels)
+
+
 async def _allowed_visibilities(
     session, viewer_account_id: int | None, target_account_id: int
 ) -> set[int]:
@@ -733,9 +747,9 @@ async def account_statuses(
     params: Annotated[PageParams, Depends(page_params)],
     exclude_replies: bool = Query(default=False),
     exclude_reblogs: bool = Query(default=False),
-    only_media: bool = Query(default=False),  # noqa: ARG001 — media isn't modeled yet
+    only_media: bool = Query(default=False),
     pinned: bool = Query(default=False),
-    tagged: str | None = Query(default=None),  # noqa: ARG001 — tags not modeled yet
+    tagged: str | None = Query(default=None),
 ) -> list[Status_]:
     target = await _load_target(session, account_id)
     viewer_account_id = auth.account.id if (auth and auth.account) else None
@@ -873,7 +887,7 @@ class _FollowCursor:
     """Pagination row carrying the underlying Follow.id (the cursor key)
     and the related Account.id (what we render)."""
 
-    __slots__ = ("follow_id", "account_id")
+    __slots__ = ("account_id", "follow_id")
 
     def __init__(self, follow_id: int, account_id: int) -> None:
         self.follow_id = follow_id

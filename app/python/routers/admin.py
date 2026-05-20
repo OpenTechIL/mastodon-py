@@ -14,17 +14,17 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.python.common.snowflake import id_at as snowflake_at
 from app.python.deps import CurrentAccount, DBSession
-from app.python.models import Account, OAuthApplication, Report, Status, User
+from app.python.models import Account, Report, User
 from app.python.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -50,13 +50,13 @@ class _DateRange(BaseModel):
 
 def _parse_dt(s: str | None) -> datetime:
     if not s:
-        return datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+        return datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(days=30)
     for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d"):
         try:
             return datetime.strptime(s, fmt)
         except ValueError:
             continue
-    return datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+    return datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(days=30)
 
 
 # ── dimensions ────────────────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ async def dimensions(
     account: CurrentAccount,
 ) -> list[dict[str, Any]]:
     start_at = _parse_dt(body.get("start_at"))
-    end_at = _parse_dt(body.get("end_at")) if body.get("end_at") else datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    end_at = _parse_dt(body.get("end_at")) if body.get("end_at") else datetime.now(tz=UTC).replace(tzinfo=None)
     limit = int(body.get("limit") or 10)
     keys = body.get("keys") or []
 
@@ -386,7 +386,7 @@ async def measures(
     account: CurrentAccount,
 ) -> list[dict[str, Any]]:
     start_at = _parse_dt(body.get("start_at"))
-    end_at = _parse_dt(body.get("end_at")) if body.get("end_at") else datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    end_at = _parse_dt(body.get("end_at")) if body.get("end_at") else datetime.now(tz=UTC).replace(tzinfo=None)
     keys = body.get("keys") or []
 
     result = []
@@ -410,7 +410,7 @@ async def retention(
     account: CurrentAccount,
 ) -> list[dict[str, Any]]:
     start_at = _parse_dt(body.get("start_at"))
-    end_at = _parse_dt(body.get("end_at")) if body.get("end_at") else datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    end_at = _parse_dt(body.get("end_at")) if body.get("end_at") else datetime.now(tz=UTC).replace(tzinfo=None)
     frequency = body.get("frequency", "day")
     if frequency not in ("day", "month"):
         frequency = "day"
@@ -482,11 +482,11 @@ async def admin_trends_tags(
     limit: int = Query(default=10, ge=1, le=20),
     offset: int = Query(default=0, ge=0),
 ) -> list[dict[str, Any]]:
-    from app.python.models import Tag  # noqa: PLC0415
-    from sqlalchemy.orm import selectinload  # noqa: PLC0415
+
+    from app.python.models import Tag
 
     # Return tags ordered by usage (statuses count via StatusTag)
-    from app.python.models.status_tag import StatusTag  # noqa: PLC0415
+    from app.python.models.status_tag import StatusTag
     rows = (await session.execute(
         select(Tag, func.count(StatusTag.status_id).label("uses"))
         .outerjoin(StatusTag, StatusTag.tag_id == Tag.id)
@@ -518,7 +518,7 @@ async def admin_get_report(
     session: DBSession,
     account: CurrentAccount,
 ) -> dict[str, Any]:
-    from app.python.schemas.account import serialize_account  # noqa: PLC0415
+    from app.python.schemas.account import serialize_account
 
     report = (await session.execute(
         select(Report).where(Report.id == report_id)

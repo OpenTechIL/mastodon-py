@@ -23,9 +23,9 @@ router = APIRouter(tags=["web"])
 
 async def _load_user_appearance(request: Request, session) -> dict:
     """Return user appearance prefs from web_settings.  Falls back to defaults."""
-    from app.python.routers.auth_web import get_session_data  # noqa: PLC0415
-    from app.python.models import User  # noqa: PLC0415
-    from app.python.models.web_setting import WebSetting  # noqa: PLC0415
+    from app.python.models import User
+    from app.python.models.web_setting import WebSetting
+    from app.python.routers.auth_web import get_session_data
 
     session_data = get_session_data(request)
     if not session_data:
@@ -50,9 +50,9 @@ async def _load_user_appearance(request: Request, session) -> dict:
 
 
 async def _build_initial_state(request: Request, session) -> dict:
-    from app.python.routers.auth_web import get_session_data  # noqa: PLC0415
-    from app.python.models import User  # noqa: PLC0415
-    from app.python.models.web_setting import WebSetting  # noqa: PLC0415
+    from app.python.models import User
+    from app.python.models.web_setting import WebSetting
+    from app.python.routers.auth_web import get_session_data
 
     s = get_settings()
     domain = s.local_domain

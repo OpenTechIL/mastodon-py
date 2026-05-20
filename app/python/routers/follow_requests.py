@@ -110,7 +110,7 @@ async def reject(
 class _Pair:
     """Pagination row — see `routers/listings.py` for the contract."""
 
-    __slots__ = ("id", "account_id")
+    __slots__ = ("account_id", "id")
 
     def __init__(self, jid: int, aid: int) -> None:
         self.id = jid

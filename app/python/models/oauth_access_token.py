@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, DateTime, Integer, String
@@ -32,14 +32,14 @@ class OAuthAccessToken(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
     last_used_ip: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    application: Mapped["OAuthApplication | None"] = relationship(  # type: ignore[name-defined]
+    application: Mapped[OAuthApplication | None] = relationship(  # type: ignore[name-defined]
         "OAuthApplication",
         primaryjoin="OAuthAccessToken.application_id == OAuthApplication.id",
         foreign_keys=lambda: [OAuthAccessToken.application_id],
         lazy="joined",
         viewonly=True,
     )
-    user: Mapped["User | None"] = relationship(  # type: ignore[name-defined]
+    user: Mapped[User | None] = relationship(  # type: ignore[name-defined]
         "User",
         primaryjoin="OAuthAccessToken.resource_owner_id == User.id",
         foreign_keys=lambda: [OAuthAccessToken.resource_owner_id],
@@ -50,10 +50,10 @@ class OAuthAccessToken(Base):
     def is_expired(self, *, now: datetime | None = None) -> bool:
         if self.expires_in is None:
             return False
-        now = now or datetime.now(tz=timezone.utc)
+        now = now or datetime.now(tz=UTC)
         created = self.created_at
         if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
+            created = created.replace(tzinfo=UTC)
         return created + timedelta(seconds=self.expires_in) <= now
 
     def is_revoked(self) -> bool:

@@ -16,13 +16,12 @@ from app.python.db import dispose_engine
 from app.python.routers import accounts as accounts_router
 from app.python.routers import activitypub as activitypub_router
 from app.python.routers import admin as admin_router
-from app.python.routers import auth_web as auth_web_router
-from app.python.routers import collections as collections_router
-from app.python.routers import directory as directory_router
-from app.python.routers import profile as profile_router
 from app.python.routers import announcements as announcements_router
 from app.python.routers import apps as apps_router
+from app.python.routers import auth_web as auth_web_router
+from app.python.routers import collections as collections_router
 from app.python.routers import conversations as conversations_router
+from app.python.routers import directory as directory_router
 from app.python.routers import featured_tags as featured_tags_router
 from app.python.routers import filters as filters_router
 from app.python.routers import follow_requests as follow_requests_router
@@ -34,6 +33,7 @@ from app.python.routers import moderation as moderation_router
 from app.python.routers import notifications as notifications_router
 from app.python.routers import oauth as oauth_router
 from app.python.routers import polls as polls_router
+from app.python.routers import profile as profile_router
 from app.python.routers import search as search_router
 from app.python.routers import settings as settings_router
 from app.python.routers import startup as startup_router

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import bcrypt
 from fastapi import APIRouter, Form, Request
@@ -372,7 +372,7 @@ def _filter_action_label(action: int) -> str:
 def _expiry_label(expires_at: datetime | None) -> str:
     if expires_at is None:
         return "Never"
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     diff = expires_at - now
     if diff.total_seconds() <= 0:
         return "Expired"
@@ -468,7 +468,7 @@ async def filter_create(request: Request):
         return RedirectResponse("/auth/sign_in", status_code=302)
     account_id = session.get("account_id")
     form = await request.form()
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
 
     phrase = str(form.get("phrase", "")).strip()
     action = int(form.get("action", "0"))
@@ -564,7 +564,7 @@ async def filter_update_or_delete(request: Request, filter_id: int):
             return RedirectResponse("/filters", status_code=302)
 
         # Update
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         f.phrase = str(form.get("phrase", "")).strip()
         f.action = int(form.get("action", "0"))
         f.context = [c for c in ["home", "notifications", "public", "thread", "account"]
@@ -793,7 +793,7 @@ async def statuses_cleanup_post(request: Request):
         return RedirectResponse("/auth/sign_in", status_code=302)
     account_id = session.get("account_id")
     form = await request.form()
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
 
     enabled = form.get("enabled") == "1"
     min_age = int(form.get("min_status_age", "1209600"))
@@ -894,7 +894,7 @@ async def auth_edit_post(request: Request):
         return RedirectResponse("/auth/sign_in", status_code=302)
     user_id = session.get("user_id")
     form = await request.form()
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
 
     new_email = str(form.get("email", "")).strip()
     current_pw = str(form.get("current_password", ""))

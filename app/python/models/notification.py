@@ -26,10 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.python.db import Base
 
 if TYPE_CHECKING:
-    from app.python.models.favourite import Favourite
-    from app.python.models.follow import Follow
-    from app.python.models.follow_request import FollowRequest
-    from app.python.models.status import Status
+    pass
 
 
 class NotificationType(StrEnum):

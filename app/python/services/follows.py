@@ -27,7 +27,7 @@ Deferred to their owning phases:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -112,7 +112,7 @@ async def follow(
     if pending is not None:
         return pending
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     follow_id = now_id()
     follow_uri = (
         f"{account_uri(source)}#follows/{follow_id}" if source.local else None
@@ -244,7 +244,7 @@ async def authorize_follow_request(
         delete(FollowRequest).where(FollowRequest.id == req.id)
     )
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     follow_row = Follow(
         id=now_id(),
         account_id=requester.id,

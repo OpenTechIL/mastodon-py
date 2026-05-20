@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import delete, or_, select
 
 from app.python.common.pagination import (
@@ -148,6 +147,28 @@ async def mark_read(
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
     row.unread = False
+    row.lock_version += 1
+    await session.commit()
+    return await _serialize_one(session, viewer, row)
+
+
+@router.post("/api/v1/conversations/{conversation_id}/unread", response_model=Conversation_)
+async def mark_unread(
+    conversation_id: int,
+    session: DBSession,
+    viewer: CurrentAccount,
+) -> Conversation_:
+    row = (
+        await session.execute(
+            select(AccountConversation).where(
+                AccountConversation.id == conversation_id,
+                AccountConversation.account_id == viewer.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
+    row.unread = True
     row.lock_version += 1
     await session.commit()
     return await _serialize_one(session, viewer, row)

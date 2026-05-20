@@ -10,14 +10,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlencode
 
 import bcrypt
 from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
-from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.python.common.snowflake import now_id
@@ -161,7 +159,7 @@ async def sign_in_post(
 ) -> Response:
     async with session_factory()() as session:
         # accept email or username@domain
-        if "@" in email and "." in email.split("@")[-1]:
+        if "@" in email and "." in email.rsplit("@", maxsplit=1)[-1]:
             stmt = select(User).where(User.email == email)
         else:
             # treat as username — look up account first
@@ -187,7 +185,7 @@ async def sign_in_post(
             return HTMLResponse(_sign_in_form("Your account has been disabled."), status_code=403)
 
         # Find or create an access token for the web app
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         existing_token = (
             await session.execute(
                 select(OAuthAccessToken)
@@ -292,7 +290,7 @@ async def sign_up_post(
             return HTMLResponse(_sign_up_form("Email is already in use.", values), status_code=422)
 
         settings = get_settings()
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         domain = settings.local_domain
 
         account = Account(

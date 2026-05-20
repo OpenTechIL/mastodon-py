@@ -63,7 +63,7 @@ async def delete_status(
 
     await session.commit()
 
-    from app.python.services.streaming import publish_delete  # noqa: PLC0415
+    from app.python.services.streaming import publish_delete
     await publish_delete(status.id, author.id)
 
     return status

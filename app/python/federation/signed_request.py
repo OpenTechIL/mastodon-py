@@ -18,7 +18,8 @@ not found" leaks information without helping anyone.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING
 from urllib.parse import urldefrag
 
 from app.python.federation.key_resolver import resolve_public_key

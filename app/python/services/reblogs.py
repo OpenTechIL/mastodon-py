@@ -25,7 +25,7 @@ Deferred to their owning phases:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,7 +81,7 @@ async def reblog(
     if existing is not None:
         return existing
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     wrapper_id = now_id()
     wrapper_uri: str | None = None
     if account.local:

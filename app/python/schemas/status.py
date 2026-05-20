@@ -48,7 +48,7 @@ class Status_(BaseModel):
 
     account: Account_
     content: str
-    reblog: "Status_ | None" = None
+    reblog: Status_ | None = None
 
     # Authenticated-only relationship flags; for anon callers these are
     # absent. We always emit them as false to keep the client happy

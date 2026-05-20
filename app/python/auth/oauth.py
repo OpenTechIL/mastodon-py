@@ -26,7 +26,7 @@ Explicitly deferred to a later slice:
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +35,6 @@ from app.python.auth import otp as otp_module
 from app.python.auth import passwords
 from app.python.common.snowflake import now_id
 from app.python.models import OAuthAccessToken, OAuthApplication, User
-
 
 DEFAULT_SCOPES = "read"  # Doorkeeper default in legacy config.
 
@@ -68,7 +67,7 @@ async def register_application(
     scopes: str | None,
     website: str | None,
 ) -> OAuthApplication:
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = OAuthApplication(
         id=now_id(),
         name=client_name,
@@ -111,7 +110,7 @@ async def client_credentials_grant(
 ) -> OAuthAccessToken:
     """Mint a token bound to the application (no resource owner)."""
     app = await _resolve_client(session, client_id, client_secret)
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     token = OAuthAccessToken(
         id=now_id(),
         token=_generate_credential(),
@@ -167,7 +166,7 @@ async def password_grant(
         # reused within the drift window.
         user.consumed_timestep = result.consumed_timestep
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     token = OAuthAccessToken(
         id=now_id(),
         token=_generate_credential(),
@@ -215,6 +214,6 @@ async def revoke_token(
         return True  # masquerade as success per RFC 7009
     if row.revoked_at is not None:
         return True
-    row.revoked_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    row.revoked_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await session.commit()
     return True

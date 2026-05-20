@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.python.lib.asset_urls import _asset_host  # noqa: PLC2701
+from app.python.lib.asset_urls import _asset_host
 from app.python.models import Tag
 
 

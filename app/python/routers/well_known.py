@@ -30,7 +30,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
 from app.python.deps import DBSession
-from app.python.lib.asset_urls import _asset_host  # noqa: PLC2701
+from app.python.lib.asset_urls import _asset_host
 from app.python.models import Account, Status, User
 from app.python.settings import get_settings
 

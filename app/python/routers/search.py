@@ -20,7 +20,7 @@ single-instance dev; Phase 5 swaps the backend.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -59,7 +59,7 @@ async def search(
     limit: int = Query(default=20, ge=1, le=40),
     offset: int = Query(default=0, ge=0),
     following: bool = Query(default=False),
-    resolve: bool = Query(default=False),  # noqa: ARG001 — webfinger deferred
+    resolve: bool = Query(default=False),
 ) -> SearchResults:
     q = q.strip()
     if not q:

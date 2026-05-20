@@ -8,7 +8,7 @@ silently writing a filter that never matches.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -185,7 +185,7 @@ async def create(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
     context = _validate_context(body.context)
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = CustomFilter(
         id=now_id(),
         account_id=viewer.id,
@@ -231,9 +231,9 @@ async def update(
                 status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
             ) from exc
     if body.expires_in is not None:
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         row.expires_at = _expires_at(now, body.expires_in)
-    row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await session.commit()
     return await _serialize_filter(session, row)
 
@@ -301,7 +301,7 @@ async def add_keyword(
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail="keyword can't be blank"
         )
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = CustomFilterKeyword(
         id=now_id(),
         custom_filter_id=filter_id,
@@ -367,7 +367,7 @@ async def add_status(
     viewer: CurrentAccount,
 ) -> FilterStatus_:
     await _owned_filter(session, viewer.id, filter_id)
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = CustomFilterStatus(
         id=now_id(),
         custom_filter_id=filter_id,

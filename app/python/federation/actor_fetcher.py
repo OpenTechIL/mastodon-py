@@ -27,7 +27,7 @@ port them when the inbound flows demand it.
 from __future__ import annotations
 
 import json as _json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -105,7 +105,7 @@ async def fetch_and_persist_actor(
     if existing is not None:
         return existing
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = Account(
         id=now_id(),
         username=username,

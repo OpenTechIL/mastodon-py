@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -167,7 +167,7 @@ async def token(
 
     created_at = access_token.created_at
     if created_at.tzinfo is None:
-        created_at = created_at.replace(tzinfo=timezone.utc)
+        created_at = created_at.replace(tzinfo=UTC)
     return TokenResponse(
         access_token=access_token.token,
         token_type="Bearer",

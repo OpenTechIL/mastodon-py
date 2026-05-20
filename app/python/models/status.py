@@ -66,14 +66,14 @@ class Status(Base, Discardable):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
 
-    account: Mapped["Account"] = relationship(  # type: ignore[name-defined]
+    account: Mapped[Account] = relationship(  # type: ignore[name-defined]
         "Account",
         primaryjoin="Status.account_id == Account.id",
         lazy="joined",
         viewonly=True,
     )
 
-    reblog: Mapped["Status | None"] = relationship(  # type: ignore[name-defined]
+    reblog: Mapped[Status | None] = relationship(  # type: ignore[name-defined]
         "Status",
         primaryjoin="Status.reblog_of_id == Status.id",
         remote_side="Status.id",
@@ -83,7 +83,7 @@ class Status(Base, Discardable):
         uselist=False,
     )
 
-    stat: Mapped["StatusStat | None"] = relationship(  # type: ignore[name-defined]
+    stat: Mapped[StatusStat | None] = relationship(  # type: ignore[name-defined]
         "StatusStat",
         primaryjoin="Status.id == StatusStat.status_id",
         uselist=False,

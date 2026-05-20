@@ -23,7 +23,7 @@ spinning an arq runtime.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select
@@ -65,13 +65,13 @@ async def _run(
 
     if row.file_file_name is None or row.file_content_type is None:
         row.processing = MediaProcessing.FAILED.value
-        row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
         return
 
     media_type = _detect_type(row.file_content_type)
     if media_type is MediaType.UNKNOWN:
         row.processing = MediaProcessing.FAILED.value
-        row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
         return
 
     original_key = _storage_key(row.id, "original", row.file_file_name)
@@ -79,7 +79,7 @@ async def _run(
         data = await storage.read(original_key)
     except FileNotFoundError:
         row.processing = MediaProcessing.FAILED.value
-        row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
         return
 
     if media_type is MediaType.VIDEO:
@@ -91,7 +91,7 @@ async def _run(
 
     if processed is None:
         row.processing = MediaProcessing.FAILED.value
-        row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
         return
 
     original_bytes, original_dims, blurhash_str, small_bytes, small_dims = processed
@@ -119,7 +119,7 @@ async def _run(
     row.file_meta = file_meta
     row.blurhash = blurhash_str
     row.processing = MediaProcessing.READY.value
-    row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
 
 
 async def prepare_media_attachment(

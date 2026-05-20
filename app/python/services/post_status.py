@@ -38,13 +38,13 @@ just don't model yet):
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import asyncio
+from datetime import UTC, datetime
 
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import asyncio
 
 from app.python.common.counter_cache import adjust_counter
 from app.python.common.snowflake import now_id
@@ -52,7 +52,7 @@ from app.python.federation.fanout import collect_inbox_urls
 from app.python.federation.keys import ensure_local_actor_keys
 from app.python.federation.serializers import serialize_create_activity
 from app.python.lib import hashtags, mentions
-from app.python.lib.asset_urls import _asset_host  # noqa: PLC2701 — same package
+from app.python.lib.asset_urls import _asset_host
 from app.python.models import (
     Account,
     AccountStat,
@@ -68,7 +68,6 @@ from app.python.models import (
 from app.python.policies.status_policy import visible_to
 from app.python.queue import Enqueuer
 from app.python.services.notifications import create_local as create_notification
-
 
 _VISIBILITY_BY_NAME: dict[str, Visibility] = {
     "public": Visibility.PUBLIC,
@@ -94,7 +93,7 @@ async def post_status(
     language: str | None = None,
     in_reply_to_id: int | None = None,
     media_ids: list[int] | None = None,
-    poll: "PollSpec | None" = None,
+    poll: PollSpec | None = None,
     enqueuer: Enqueuer | None = None,
 ) -> Status:
     text = text or ""
@@ -119,7 +118,7 @@ async def post_status(
         if parent is None or not await visible_to(session, parent, author.id):
             raise StatusValidationError("Replying to a non-existent or invisible status")
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     new_id = now_id()
     host = _asset_host()
     uri = f"{host}/users/{author.username}/statuses/{new_id}"
@@ -204,7 +203,7 @@ async def post_status(
     await session.commit()
 
     # Live streaming: publish to Redis so the streaming server pushes to subscribed clients.
-    from app.python.services.streaming import publish_status  # noqa: PLC0415
+    from app.python.services.streaming import publish_status
     await publish_status(session, row, author)
 
     # Outbound federation: deliver to remote followers after commit.
@@ -333,6 +332,7 @@ async def _attach_media(
     bad media_ids should fail visibly rather than post text-only.
     """
     from sqlalchemy import select as sa_select
+
     from app.python.models import MediaAttachment
 
     if len(media_ids) > 4:
@@ -447,7 +447,8 @@ async def _link_mentions(
     fire a `mention` notification per local recipient. Self-mentions
     don't get rows or notifications.
     """
-    from sqlalchemy import and_, or_, select as sa_select
+    from sqlalchemy import and_, or_
+    from sqlalchemy import select as sa_select
 
     parsed = mentions.extract(status.text)
     if not parsed:

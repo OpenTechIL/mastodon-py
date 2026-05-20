@@ -11,10 +11,10 @@ are a separate phase. This module covers what an end user can do.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 
@@ -35,7 +35,6 @@ from app.python.models import (
     parse_report_category,
 )
 from app.python.schemas.account import Account_, serialize_account
-from fastapi import Request, Response
 
 router = APIRouter(tags=["moderation"])
 
@@ -105,7 +104,7 @@ async def create_report(
             status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = Report(
         id=now_id(),
         account_id=viewer.id,
@@ -162,7 +161,7 @@ async def domain_blocks_index(
 
 
 class _DomainCursor:
-    __slots__ = ("id", "domain")
+    __slots__ = ("domain", "id")
 
     def __init__(self, jid: int, domain: str) -> None:
         self.id = jid
@@ -199,7 +198,7 @@ async def domain_block_add(
     ).scalar_one_or_none()
     if existing is not None:
         return {}
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     session.add(
         AccountDomainBlock(
             id=now_id(),

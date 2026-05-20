@@ -81,15 +81,14 @@ async def deliver_activity(
     inbox_urls: list[str],
 ) -> dict[str, int]:
     """arq entry point. Opens its own session + http client."""
-    async with session_factory()() as session:
-        async with httpx.AsyncClient(timeout=10.0) as http_client:
-            report = await _run(
-                session,
-                http_client,
-                activity=activity,
-                sender_account_id=sender_account_id,
-                inbox_urls=inbox_urls,
-            )
+    async with session_factory()() as session, httpx.AsyncClient(timeout=10.0) as http_client:
+        report = await _run(
+            session,
+            http_client,
+            activity=activity,
+            sender_account_id=sender_account_id,
+            inbox_urls=inbox_urls,
+        )
     return {
         "attempts": report.attempts,
         "successes": report.successes,

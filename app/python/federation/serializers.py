@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.python.lib.asset_urls import account_uri, _asset_host  # noqa: PLC2701
+from app.python.lib.asset_urls import _asset_host, account_uri
 from app.python.models import Visibility
 
 if TYPE_CHECKING:
@@ -59,7 +59,7 @@ _MEDIA_TYPE_MAP = {
 }
 
 
-def serialize_note(status: "Status", author: "Account") -> dict:
+def serialize_note(status: Status, author: Account) -> dict:
     """Status → AP Note dict."""
     author_uri = account_uri(author)
     to, cc = _audience(status, author_uri)

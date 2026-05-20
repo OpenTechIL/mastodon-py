@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 def _redis_client():
     """Return a synchronous-compatible async Redis client."""
     import redis.asyncio as redis  # imported lazily so tests without Redis still work
+
     from app.python.settings import get_settings
     s = get_settings()
     return redis.Redis(host=s.redis_host, port=s.redis_port, password=s.redis_password)

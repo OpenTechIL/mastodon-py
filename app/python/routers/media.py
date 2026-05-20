@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 
 from app.python.deps import CurrentAccount, DBSession
-from app.python.models import MediaAttachment, MediaProcessing, MediaType
+from app.python.models import MediaAttachment, MediaType
 from app.python.queue import Enqueuer, get_enqueuer
 from app.python.services import media as media_service
 

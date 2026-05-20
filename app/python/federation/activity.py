@@ -26,7 +26,7 @@ Activity shapes (abbreviated):
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -197,7 +197,7 @@ async def _handle_follow(
             existing_req.uri = follow_uri or existing_req.uri
             await session.commit()
             return
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         session.add(
             FollowRequest(
                 id=now_id(),
@@ -229,7 +229,7 @@ async def _handle_follow(
         existing.uri = follow_uri or existing.uri
         await session.commit()
     else:
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         session.add(
             Follow(
                 id=now_id(),
@@ -447,7 +447,7 @@ async def _handle_create_note(
             in_reply_to_id = parent.id
             in_reply_to_account_id = parent.account_id
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     session.add(
         Status(
             id=now_id(),
@@ -495,7 +495,7 @@ async def _handle_delete_status(
     ).scalar_one_or_none()
     if row is None:
         return
-    row.deleted_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    row.deleted_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await session.commit()
 
 
@@ -552,7 +552,7 @@ async def _handle_like(
     if existing is not None:
         return
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     session.add(
         Favourite(
             id=now_id(),
@@ -643,7 +643,7 @@ async def _handle_announce(
     cc = _as_list(activity.get("cc"))
     visibility = _derive_visibility(to, cc, f"{actor_url}/followers")
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     session.add(
         Status(
             id=now_id(),
@@ -701,7 +701,7 @@ async def _handle_undo_announce(
     ).scalar_one_or_none()
     if existing is None:
         return
-    existing.deleted_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    existing.deleted_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await adjust_counter(
         session,
         table="status_stats",
@@ -763,7 +763,7 @@ async def _handle_update_actor(
     if new_shared:
         row.shared_inbox_url = new_shared
 
-    row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await session.commit()
 
 
@@ -811,7 +811,7 @@ async def _handle_undo_announce_by_uri(
     if reblog is None:
         return
     target_id = reblog.reblog_of_id
-    reblog.deleted_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    reblog.deleted_at = datetime.now(tz=UTC).replace(tzinfo=None)
     if target_id is not None:
         await adjust_counter(
             session,

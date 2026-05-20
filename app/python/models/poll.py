@@ -14,15 +14,13 @@ the tally bumps (deferred; we update under a transaction).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
 
 from sqlalchemy import ARRAY, BigInteger, Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from app.python.db import Base
-
 
 _PG_OR_JSON_STR_ARRAY = ARRAY(String).with_variant(JSON(), "sqlite")
 _PG_OR_JSON_BIGINT_ARRAY = ARRAY(BigInteger).with_variant(JSON(), "sqlite")
@@ -64,5 +62,5 @@ class Poll(Base):
             return False
         expires = self.expires_at
         if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        return expires <= datetime.now(tz=timezone.utc)
+            expires = expires.replace(tzinfo=UTC)
+        return expires <= datetime.now(tz=UTC)

@@ -20,7 +20,7 @@ contract or pushed events would diverge from REST responses.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,7 +72,7 @@ async def resolve_bearer(
     if access_token is None:
         return None
 
-    now = now or datetime.now(tz=timezone.utc)
+    now = now or datetime.now(tz=UTC)
     if access_token.is_revoked() or access_token.is_expired(now=now):
         return None
 

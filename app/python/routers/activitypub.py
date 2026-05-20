@@ -32,7 +32,7 @@ from app.python.deps import DBSession, HttpClient
 from app.python.federation.activity import dispatch as dispatch_activity
 from app.python.federation.serializers import serialize_create_activity, serialize_note
 from app.python.federation.signed_request import verify_signed_request
-from app.python.lib.asset_urls import _asset_host, account_uri, avatar_url, header_url  # noqa: PLC2701
+from app.python.lib.asset_urls import _asset_host, account_uri, avatar_url, header_url
 from app.python.models import Account, Follow, Status, StatusPin, Visibility
 from app.python.queue import Enqueuer, get_enqueuer
 

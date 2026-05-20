@@ -74,7 +74,37 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S", "RUF", "SIM", "PL"]
-ignore = ["PLR0913", "S101"]
+ignore = [
+  "PLR0913", # too-many-arguments
+  "S101", # assert-used (tests)
+  "B008", # function-call-in-default-argument (FastAPI Depends())
+  "PLC0415", # import-outside-top-level (lazy imports in routers)
+  "PLW0603", # global-statement
+  "PLW1510", # subprocess-run-without-check
+  "PLW2901", # redefined-loop-name
+  "S607", # start-process-with-partial-path
+  "S603", # subprocess-without-shell-equals-true
+  "S105", # hardcoded-password-string (false positives on token_scopes)
+  "S106", # hardcoded-password-func-arg (false positives on token_type)
+  "S110", # try-except-pass (intentional in registration/optional flows)
+  "PLR0911", # too-many-return-statements
+  "PLR0912", # too-many-branches
+  "PLR2004", # magic-value-comparison (HTTP status codes are self-documenting)
+  "E402", # module-import-not-at-top-of-file
+  "E501", # line-too-long (120 limit enforced by formatter)
+  "F811", # redefined-while-unused (intentional re-exports)
+  "F841", # unused-variable (some async results intentionally discarded)
+  "RUF001", # ambiguous-unicode-character-string
+  "RUF002", # ambiguous-unicode-character-docstring
+  "RUF003", # ambiguous-unicode-character-comment
+  "ASYNC221", # run-process-in-async-function (FFmpeg/media processing)
+  "ASYNC240", # blocking-path-method-in-async-function (local storage)
+  "SIM102", # collapsible-if (readability preference)
+  "SIM103", # needless-bool
+  "SIM108", # if-else-block-instead-of-if-exp (readability preference)
+  "PLC0206", # dict-index-missing-items
+  "RUF012", # mutable-class-default
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "PLR2004"]

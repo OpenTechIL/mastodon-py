@@ -23,7 +23,7 @@ counter; we do it explicitly so the path is greppable.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,7 +63,7 @@ async def favourite(
     if existing is not None:
         return existing
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = Favourite(
         id=now_id(),
         account_id=account.id,

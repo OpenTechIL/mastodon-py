@@ -34,7 +34,7 @@ import json
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Literal
 
@@ -634,7 +634,7 @@ async def upload_media(
     if small_dims is not None:
         file_meta["small"] = small_dims
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = MediaAttachment(
         id=attachment_id,
         account_id=author.id,
@@ -673,7 +673,7 @@ async def upload_media_async(
     content_type: str,
     file_obj: IO[bytes],
     description: str | None = None,
-    enqueuer: "Enqueuer",
+    enqueuer: Enqueuer,
 ) -> MediaAttachment:
     """v2 contract: write original, insert PROCESSING row, enqueue the
     job. Returns immediately; clients poll `/api/v1/media/{id}` for the
@@ -705,7 +705,7 @@ async def upload_media_async(
         _storage_key(attachment_id, "original", file_name), data
     )
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = MediaAttachment(
         id=attachment_id,
         account_id=author.id,
@@ -748,7 +748,7 @@ async def update_media(
         raise MediaValidationError("not your attachment")
     if description is not None:
         attachment.description = description
-    attachment.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    attachment.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await session.commit()
     return attachment
 

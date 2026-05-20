@@ -9,8 +9,8 @@ from sqlalchemy import select
 
 from app.python.deps import CurrentAccount, DBSession, OptionalAuth
 from app.python.models import Account, Favourite, Status, StatusEdit
-from app.python.queue import Enqueuer, get_enqueuer
 from app.python.policies.status_policy import visible_to
+from app.python.queue import Enqueuer, get_enqueuer
 from app.python.schemas.status import Status_, serialize_status
 from app.python.schemas.status_create import StatusCreate
 from app.python.schemas.status_edit import (
@@ -500,7 +500,7 @@ async def favourited_by(
     limit: int = Query(default=40, ge=1, le=80),
 ) -> list[Any]:
     """Accounts that favourited the status."""
-    from app.python.schemas.account import serialize_account  # noqa: PLC0415
+    from app.python.schemas.account import serialize_account
 
     viewer_id = viewer.account.id if (viewer and viewer.account) else None
     st = await _load_visible_status(session, status_id, viewer_id)
@@ -528,7 +528,7 @@ async def reblogged_by(
     limit: int = Query(default=40, ge=1, le=80),
 ) -> list[Any]:
     """Accounts that reblogged the status."""
-    from app.python.schemas.account import serialize_account  # noqa: PLC0415
+    from app.python.schemas.account import serialize_account
 
     viewer_id = viewer.account.id if (viewer and viewer.account) else None
     st = await _load_visible_status(session, status_id, viewer_id)

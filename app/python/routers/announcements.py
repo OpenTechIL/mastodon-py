@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import select
 
 from app.python.common.snowflake import now_id
 from app.python.deps import CurrentAccount, DBSession, OptionalAuth
@@ -58,7 +58,7 @@ async def index(
     date is in the future). Anonymous viewers see the same list; the
     `read` flag is always `false` for them.
     """
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     rows = (
         await session.execute(
             select(Announcement)
@@ -146,7 +146,7 @@ async def dismiss(
         )
     ).scalar_one_or_none()
     if existing is None:
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         session.add(
             AnnouncementMute(
                 id=now_id(),

@@ -14,7 +14,7 @@ into a single `app/python/lib/limits.py` module.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter
@@ -22,10 +22,9 @@ from pydantic import BaseModel
 from sqlalchemy import distinct, func, select
 
 from app.python.deps import DBSession
-from app.python.lib.asset_urls import _asset_host, avatar_url, header_url  # noqa: PLC2701
+from app.python.lib.asset_urls import _asset_host, avatar_url, header_url
 from app.python.models import Account, AccountStat, Status, StatusStat, StatusTag, Tag, User, Visibility
 from app.python.settings import get_settings
-
 
 # Hardcoded for now — see module docstring.
 STATUS_MAX_CHARACTERS = 500
@@ -280,7 +279,7 @@ _PRIVACY_POLICY_TEMPLATE: str | None = None
 
 
 def _load_privacy_policy_template() -> str:
-    global _PRIVACY_POLICY_TEMPLATE  # noqa: PLW0603
+    global _PRIVACY_POLICY_TEMPLATE
     if _PRIVACY_POLICY_TEMPLATE is None:
         try:
             with open("config/templates/privacy-policy.md", encoding="utf-8") as f:
@@ -292,7 +291,7 @@ def _load_privacy_policy_template() -> str:
 
 @router.get("/api/v1/instance/privacy_policy")
 async def instance_privacy_policy() -> dict[str, Any]:
-    import markdown as md  # noqa: PLC0415
+    import markdown as md
 
     settings = get_settings()
     template = _load_privacy_policy_template()
@@ -351,9 +350,9 @@ async def instance_rules() -> list[dict[str, Any]]:
 @router.get("/api/v1/trends/statuses", response_model=list[dict[str, Any]])
 async def trends_statuses(session: DBSession) -> list[dict[str, Any]]:
     """Return the 20 most-engaged public local statuses from the last 7 days."""
-    from app.python.schemas.status import serialize_status  # noqa: PLC0415
+    from app.python.schemas.status import serialize_status
 
-    cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+    cutoff = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(days=7)
     stmt = (
         select(Status)
         .outerjoin(StatusStat, StatusStat.status_id == Status.id)
@@ -380,9 +379,9 @@ async def trends_statuses(session: DBSession) -> list[dict[str, Any]]:
 @router.get("/api/v1/trends/tags", response_model=list[dict[str, Any]])
 async def trends_tags(session: DBSession) -> list[dict[str, Any]]:
     """Return the 10 most-used hashtags in the last 7 days with per-day history."""
-    from sqlalchemy import Integer, cast, distinct  # noqa: PLC0415
+    from sqlalchemy import Integer, cast, distinct
     host = _asset_host()
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     cutoff = now - timedelta(days=7)
 
     # Find the top tags by total usage in the last 7 days.
@@ -478,7 +477,7 @@ async def trends_legacy_alias(session: DBSession) -> list[dict[str, Any]]:
 
 # ---------- /api/v1/annual_reports ----------
 
-from app.python.deps import CurrentAccount  # noqa: E402
+from app.python.deps import CurrentAccount
 
 
 @router.get("/api/v1/annual_reports", response_model=list[dict[str, Any]])

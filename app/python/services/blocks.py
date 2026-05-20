@@ -18,7 +18,7 @@ fan-out phase introduces a cached feed, that worker becomes load-bearing.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -105,7 +105,7 @@ async def block(
     await _tear_down_follow_request(session, source.id, target.id)
     await _tear_down_follow_request(session, target.id, source.id)
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = Block(
         id=now_id(),
         account_id=source.id,

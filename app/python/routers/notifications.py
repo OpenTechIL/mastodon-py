@@ -12,7 +12,7 @@ admin types port, each gains one IN-clause query of its own.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -182,10 +182,10 @@ async def _get_or_create_web_setting(
     ).scalar_one_or_none()
     if user is None:
         # Remote account — no local user; return a transient stub (never persisted).
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         return WebSetting(id=0, user_id=0, data={}, created_at=now, updated_at=now)
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     row = WebSetting(id=now_id(), user_id=user.id, data={}, created_at=now, updated_at=now)
     session.add(row)
     await session.flush()
@@ -210,7 +210,7 @@ async def _save_notification_policy(
     data = dict(ws.data or {})
     data["notification_policy"] = {k: policy[k] for k in _POLICY_BOOL_KEYS if k in policy}
     ws.data = data
-    ws.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    ws.updated_at = datetime.now(UTC).replace(tzinfo=None)
     await session.commit()
 
 

@@ -13,7 +13,7 @@ every read.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +37,7 @@ async def mute(
     if source.id == target.id:
         raise SelfMute
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     expires_at = (
         now + timedelta(seconds=duration_seconds) if duration_seconds else None
     )

@@ -20,13 +20,15 @@ from app.python.models import (
     AccountDomainBlock,
     Block,
     Follow,
-    List as List_,
     ListAccount,
     Mute,
     Status,
     StatusTag,
     Tag,
     Visibility,
+)
+from app.python.models import (
+    List as List_,
 )
 from app.python.schemas.status import Status_, serialize_status
 from app.python.services.filter_application import load_filters_for

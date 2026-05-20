@@ -10,9 +10,10 @@ is referenced there.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import HTTPException, status as http_status
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +23,6 @@ from app.python.models import (
     Follow,
     List,
     ListAccount,
-    RepliesPolicy,
     parse_replies_policy,
 )
 
@@ -72,7 +72,7 @@ async def create_list(
     replies_policy: str | None = None,
     exclusive: bool = False,
 ) -> List:
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = List(
         id=now_id(),
         account_id=owner.id,
@@ -103,7 +103,7 @@ async def update_list(
         row.replies_policy = parse_replies_policy(replies_policy).value
     if exclusive is not None:
         row.exclusive = exclusive
-    row.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    row.updated_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await session.commit()
     return row
 

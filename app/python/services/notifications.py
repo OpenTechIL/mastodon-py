@@ -20,8 +20,7 @@ Deferred to dedicated phases:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Final
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,7 +66,7 @@ async def create_local(
     if not await _is_local(session, recipient.id):
         return None
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     row = Notification(
         id=now_id(),
         account_id=recipient.id,

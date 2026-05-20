@@ -17,7 +17,7 @@ from app.python.common.pagination import (
 )
 from app.python.common.snowflake import now_id
 from app.python.deps import CurrentAccount, DBSession, OptionalAuth
-from app.python.models import Mute, Status, StatusTag, Tag, TagFollow, Visibility
+from app.python.models import FeaturedTag, Mute, Status, StatusTag, Tag, TagFollow, Visibility
 from app.python.schemas.status import Status_, serialize_status
 from app.python.schemas.tag import Tag_, serialize_tag
 from app.python.services.status_relationships import (
@@ -111,6 +111,57 @@ async def unfollow_tag(
     )
     await session.commit()
     return serialize_tag(tag, following=False)
+
+
+@router.post("/api/v1/tags/{name}/feature", response_model=Tag_)
+async def feature_tag(
+    name: str,
+    session: DBSession,
+    viewer: CurrentAccount,
+) -> Tag_:
+    tag = await _resolve_tag(session, name)
+    existing = (
+        await session.execute(
+            select(FeaturedTag).where(
+                FeaturedTag.account_id == viewer.id, FeaturedTag.tag_id == tag.id
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is None:
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
+        session.add(
+            FeaturedTag(
+                id=now_id(),
+                account_id=viewer.id,
+                tag_id=tag.id,
+                name=tag.name,
+                statuses_count=0,
+                last_status_at=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await session.commit()
+    following = await _is_following(session, viewer.id, tag.id)
+    return serialize_tag(tag, following=following)
+
+
+@router.post("/api/v1/tags/{name}/unfeature", response_model=Tag_)
+async def unfeature_tag(
+    name: str,
+    session: DBSession,
+    viewer: CurrentAccount,
+) -> Tag_:
+    from sqlalchemy import delete
+    tag = await _resolve_tag(session, name)
+    await session.execute(
+        delete(FeaturedTag).where(
+            FeaturedTag.account_id == viewer.id, FeaturedTag.tag_id == tag.id
+        )
+    )
+    await session.commit()
+    following = await _is_following(session, viewer.id, tag.id)
+    return serialize_tag(tag, following=following)
 
 
 @router.get("/api/v1/timelines/tag/{hashtag}", response_model=list[Status_])

@@ -27,9 +27,12 @@ from app.python.common.pagination import (
 )
 from app.python.common.snowflake import now_id
 from app.python.deps import CurrentAccount, DBSession
+from sqlalchemy import func
+
 from app.python.models import (
     Account,
     AccountDomainBlock,
+    Follow,
     Report,
     ReportCategory,
     parse_report_category,
@@ -128,6 +131,39 @@ async def create_report(
 
 
 # ---------- /api/v1/domain_blocks ----------
+
+
+@router.get("/api/v1/domain_blocks/preview")
+async def domain_block_preview(
+    session: DBSession,
+    viewer: CurrentAccount,
+    domain: str = Query(default=""),
+) -> dict[str, int]:
+    """Return follower/following counts that would be lost by blocking a domain."""
+    if not domain:
+        return {"followers_count": 0, "following_count": 0}
+    domain = domain.strip().lower()
+    remote_accts = select(Account.id).where(
+        Account.domain.ilike(domain),
+        Account.domain.is_not(None),
+    )
+    followers_count = (
+        await session.execute(
+            select(func.count()).select_from(Follow).where(
+                Follow.target_account_id == viewer.id,
+                Follow.account_id.in_(remote_accts),
+            )
+        )
+    ).scalar() or 0
+    following_count = (
+        await session.execute(
+            select(func.count()).select_from(Follow).where(
+                Follow.account_id == viewer.id,
+                Follow.target_account_id.in_(remote_accts),
+            )
+        )
+    ).scalar() or 0
+    return {"followers_count": int(followers_count), "following_count": int(following_count)}
 
 
 @router.get("/api/v1/domain_blocks", response_model=list[str])

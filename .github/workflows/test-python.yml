@@ -1,0 +1,68 @@
+name: Python Testing
+
+on:
+  merge_group:
+  push:
+    branches:
+      - 'main'
+      - 'stable-*'
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10ms
+          --health-timeout 3s
+          --health-retries 50
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10ms
+          --health-timeout 3s
+          --health-retries 50
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/mastodon_test
+      REDIS_URL: redis://localhost:6379/0
+      LOCAL_DOMAIN: localhost:3000
+      SECRET_KEY_BASE: test_secret_key_base_for_ci
+      OTP_SECRET: test_otp_secret_for_ci
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
+      - name: Lint with ruff
+        run: uv run ruff check app/python/
+
+      - name: Type check with mypy
+        run: uv run mypy app/python/
+
+      - name: Run tests
+        run: uv run pytest --tb=short -q

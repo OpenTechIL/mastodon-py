@@ -1,0 +1,7 @@
+web: env PORT=3001 RAILS_ENV=development bundle exec puma -C config/puma.rb
+sidekiq: env PORT=3001 RAILS_ENV=development bundle exec sidekiq
+stream: env PORT=4000 yarn workspace @mastodon/streaming start
+vite: yarn dev
+python: env PORT=8000 MASTODON_ENV=development uv run uvicorn app.python.main:app --host 127.0.0.1 --port 8000 --reload
+arq: env MASTODON_ENV=development uv run arq app.python.workers.arq_settings.WorkerSettings
+proxy: nginx -p . -c config/nginx/dev.conf -e /dev/stderr -g 'daemon off;'

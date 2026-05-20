@@ -10,6 +10,7 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+import app.python.models  # noqa: F401 — registers all models with Base.metadata
 from app.python.db import Base
 from app.python.settings import get_settings
 

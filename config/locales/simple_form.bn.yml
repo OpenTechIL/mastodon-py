@@ -1,8 +1,0 @@
----
-bn:
-  simple_form:
-    labels:
-      account:
-        fields:
-          name: লেবেল
-          value: বিষয়বস্তু

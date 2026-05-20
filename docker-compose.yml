@@ -1,140 +1,121 @@
-# This file is designed for production server deployment, not local development work
-# For a containerized local dev environment, see: https://github.com/mastodon/mastodon/blob/main/docs/DEVELOPMENT.md#docker
-
 services:
   db:
-    restart: always
     image: postgres:14-alpine
-    shm_size: 256mb
-    networks:
-      - internal_network
-    healthcheck:
-      test: ['CMD', 'pg_isready', '-U', 'postgres']
-    volumes:
-      - ./postgres14:/var/lib/postgresql/data
     environment:
-      - 'POSTGRES_HOST_AUTH_METHOD=trust'
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: mastodon_development
+      POSTGRES_USER: mastodon
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'mastodon']
+    networks:
+      - internal
 
   redis:
-    restart: always
     image: redis:7-alpine
-    networks:
-      - internal_network
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
-    volumes:
-      - ./redis:/data
-
-  # es:
-  #   restart: always
-  #   image: docker.elastic.co/elasticsearch/elasticsearch:7.17.29
-  #   environment:
-  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m -Des.enforce.bootstrap.checks=true"
-  #     - "xpack.license.self_generated.type=basic"
-  #     - "xpack.security.enabled=false"
-  #     - "xpack.watcher.enabled=false"
-  #     - "xpack.graph.enabled=false"
-  #     - "xpack.ml.enabled=false"
-  #     - "bootstrap.memory_lock=true"
-  #     - "cluster.name=es-mastodon"
-  #     - "discovery.type=single-node"
-  #     - "thread_pool.write.queue_size=1000"
-  #   networks:
-  #      - external_network
-  #      - internal_network
-  #   healthcheck:
-  #      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
-  #   volumes:
-  #      - ./elasticsearch:/usr/share/elasticsearch/data
-  #   ulimits:
-  #     memlock:
-  #       soft: -1
-  #       hard: -1
-  #     nofile:
-  #       soft: 65536
-  #       hard: 65536
-  #   ports:
-  #     - '127.0.0.1:9200:9200'
-
-  web:
-    # You can uncomment the following line if you want to not use the prebuilt image, for example if you have local code changes
-    # build: .
-    image: ghcr.io/mastodon/mastodon:v4.5.9
-    restart: always
-    env_file: .env.production
-    command: bundle exec puma -C config/puma.rb
     networks:
-      - external_network
-      - internal_network
-    healthcheck:
-      # prettier-ignore
-      test: ['CMD-SHELL',"curl -s --noproxy localhost localhost:3000/health | grep -q 'OK' || exit 1"]
+      - internal
+
+  python:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    command: uv run uvicorn app.python.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      MASTODON_ENV: development
+      DB_HOST: db
+      DB_USER: mastodon
+      DB_NAME: mastodon_development
+      REDIS_HOST: redis
+    volumes:
+      - .:/app
+      - python_venv:/app/.venv
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  arq:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    command: uv run arq app.python.workers.arq_settings.WorkerSettings
+    environment:
+      MASTODON_ENV: development
+      DB_HOST: db
+      DB_USER: mastodon
+      DB_NAME: mastodon_development
+      REDIS_HOST: redis
+    volumes:
+      - .:/app
+      - python_venv:/app/.venv
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  stream:
+    build:
+      context: .
+      dockerfile: streaming/Dockerfile
+    environment:
+      NODE_ENV: development
+      DB_HOST: db
+      DB_NAME: mastodon_development
+      DB_USER: mastodon
+      REDIS_URL: redis://redis:6379
+      PORT: '4000'
+      BIND: '0.0.0.0'
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  vite:
+    image: node:24-slim
+    working_dir: /app
+    command: sh -c "npm i -g corepack && corepack enable && yarn dev"
+    volumes:
+      - .:/app
+      - vite_modules:/app/node_modules
+      - yarn_cache:/usr/local/share/.cache/yarn
+    ports:
+      - '127.0.0.1:3036:3036'
+    networks:
+      - internal
+
+  proxy:
+    image: nginx:alpine
     ports:
       - '127.0.0.1:3000:3000'
-    depends_on:
-      - db
-      - redis
-      # - es
     volumes:
-      - ./public/system:/mastodon/public/system
-
-  streaming:
-    # You can uncomment the following lines if you want to not use the prebuilt image, for example if you have local code changes
-    # build:
-    #   dockerfile: ./streaming/Dockerfile
-    #   context: .
-    image: ghcr.io/mastodon/mastodon-streaming:v4.5.9
-    restart: always
-    env_file: .env.production
-    command: node ./streaming/index.js
-    networks:
-      - external_network
-      - internal_network
-    healthcheck:
-      # prettier-ignore
-      test: ['CMD-SHELL', "curl -s --noproxy localhost localhost:4000/api/v1/streaming/health | grep -q 'OK' || exit 1"]
-    ports:
-      - '127.0.0.1:4000:4000'
+      - ./config/nginx/docker.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - db
-      - redis
-
-  sidekiq:
-    # You can uncomment the following line if you want to not use the prebuilt image, for example if you have local code changes
-    # build: .
-    image: ghcr.io/mastodon/mastodon:v4.5.9
-    restart: always
-    env_file: .env.production
-    command: bundle exec sidekiq
-    depends_on:
-      - db
-      - redis
+      - python
+      - stream
     networks:
-      - external_network
-      - internal_network
-    volumes:
-      - ./public/system:/mastodon/public/system
-    healthcheck:
-      test: ['CMD-SHELL', "ps aux | grep '[s]idekiq\ 8' || false"]
+      - internal
 
-  ## Uncomment to enable federation with tor instances along with adding the following ENV variables
-  ## http_hidden_proxy=http://privoxy:8118
-  ## ALLOW_ACCESS_TO_HIDDEN_SERVICE=true
-  # tor:
-  #   image: sirboops/tor
-  #   networks:
-  #      - external_network
-  #      - internal_network
-  #
-  # privoxy:
-  #   image: sirboops/privoxy
-  #   volumes:
-  #     - ./priv-config:/opt/config
-  #   networks:
-  #     - external_network
-  #     - internal_network
+volumes:
+  postgres_data:
+  redis_data:
+  python_venv:
+  vite_modules:
+  yarn_cache:
 
 networks:
-  external_network:
-  internal_network:
-    internal: true
+  internal:

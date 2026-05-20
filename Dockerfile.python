@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1.18
+FROM python:3.12-slim
+
+RUN pip install uv
+
+WORKDIR /app
+
+# Install deps (cached unless pyproject.toml/uv.lock change)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --all-groups
+
+# Source code is mounted as a volume in dev; for prod, copy it in:
+COPY app/python ./app/python

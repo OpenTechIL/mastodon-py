@@ -195,3 +195,28 @@ async def index_for_account(
 ) -> list[FeaturedTag_]:
     owner = await _load_owner(session, account_id)
     return await _list_for(session, owner)
+
+
+
+@router.get("/api/v1/featured_tags/suggestions")
+async def featured_tag_suggestions(
+    session: DBSession,
+    account: CurrentAccount,
+) -> list[Any]:
+    """Return hashtags the current user has used recently as suggestions
+    for featured tags. Returns top 10 by recent usage."""
+    from app.python.models import StatusTag, Tag, Status
+
+    rows = (
+        await session.execute(
+            select(Tag.name, func.count(StatusTag.tag_id).label("cnt"))
+            .join(StatusTag, StatusTag.tag_id == Tag.id)
+            .join(Status, Status.id == StatusTag.status_id)
+            .where(Status.account_id == account.id, Status.deleted_at.is_(None))
+            .group_by(Tag.id, Tag.name)
+            .order_by(func.count(StatusTag.tag_id).desc())
+            .limit(10)
+        )
+    ).all()
+
+    return [{"name": row.name} for row in rows]

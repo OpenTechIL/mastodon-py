@@ -4,117 +4,233 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Mastodon is a federated social network server implementing ActivityPub. It is a polyglot application:
+Mastodon is a federated social network server implementing ActivityPub. This is a fork migrating from Ruby on Rails to Python FastAPI. It is a polyglot application:
 
 - **FastAPI backend** (Python 3.12+) — REST API, ActivityPub, federation. Code under `app/python/` (routers, models, services, workers, schemas, auth, federation, policies).
 - **Streaming server** (Node 20+) — separate workspace in `streaming/`, serves the WebSocket/EventSource streaming API. Talks directly to PostgreSQL and Redis.
 - **Web UI** (React + Redux + TypeScript) — single-page app in `app/javascript/mastodon/`, built by Vite. Mixes legacy `js`/`jsx` with `ts`/`tsx`; new code should be TS.
 - **arq workers** — async background job processor; workers live in `app/python/workers/`.
 
-Tech stack: PostgreSQL 14+, Redis 7+, Elasticsearch (optional), FFmpeg 5.1+, libvips. Real-time data flow is typically FastAPI (write) → DB/Redis → arq (fanout) → Streaming server (push to clients) → React UI.
+Tech stack: PostgreSQL 14+, Redis 7+, Elasticsearch (optional), FFmpeg 5.1+, libvips. Real-time data flow: FastAPI (write) → DB/Redis → arq (fanout) → Streaming server (push to clients) → React UI.
+
+## Dev environment
+
+```
+bin/dev    # Boots Procfile.dev via overmind/foreman
+```
+
+Procfile.dev processes and ports:
+
+- `python` — uvicorn FastAPI on `:8000`
+- `arq` — background job worker
+- `stream` — Node streaming server on `:4000`
+- `vite` — Vite dev server on `:3036`
+- `proxy` — nginx on `:3000` (public entry point)
+
+**Nginx routing** (`config/nginx/dev.conf`):
+
+- `/packs-dev/` → Vite (with HMR WebSocket)
+- `/api/v1/streaming` → streaming server (WebSocket)
+- Everything else → FastAPI
+
+**After changing Python code in Docker**: always rebuild and restart:
+
+```bash
+docker compose build python && docker compose up -d python && sleep 5 && docker compose restart proxy
+```
 
 ## Common commands
 
-### Running the dev environment
-
-```
-bin/dev                 # Boots Procfile.dev: uvicorn (:8000), arq, streaming (:4000), vite, nginx proxy (:3000)
-```
-
-Uses `overmind` if installed, otherwise `foreman`.
-
 ### Setup / DB
 
-```
-bin/setup                                  # Installs Python + JS packages, runs Alembic migrations
-uv run alembic upgrade head               # Run pending migrations
-uv run alembic revision --autogenerate -m "description"   # Generate new migration
+```bash
+bin/setup                                         # Install Python + JS packages, run Alembic migrations
+uv run alembic upgrade head                       # Run pending migrations
+uv run alembic revision --autogenerate -m "desc"  # Generate new migration
 ```
 
 ### Python tests (pytest)
 
-```
-uv run pytest                             # All tests
-uv run pytest tests/routers/test_accounts.py    # Single file
-uv run pytest tests/routers/test_accounts.py::test_verify_credentials   # Single test
-uv run pytest -k "search"                # Tests matching keyword
-uv run pytest --tb=short -q              # Quiet mode with short tracebacks
+```bash
+uv run pytest                                                    # All tests
+uv run pytest tests/routers/test_accounts.py                     # Single file
+uv run pytest tests/routers/test_accounts.py::test_verify_credentials  # Single test
+uv run pytest -k "search"                                        # Keyword match
+uv run pytest --tb=short -q                                      # Quiet + short tracebacks
 ```
 
 ### JS/TS tests (Vitest)
 
-```
-yarn test:js              # Watch mode (legacy-tests project — anything in __tests__/)
-yarn test:js run          # Single run
-yarn test:js run path/to/file.test.ts     # Single file
-yarn test:storybook       # Storybook component tests (uses Playwright/chromium)
-yarn storybook            # Dev storybook on :6006
+```bash
+yarn test:js run                                  # Single run (lint + typecheck + tests)
+yarn test:js run path/to/file.test.ts             # Single file
+yarn test:storybook                               # Storybook component tests
+yarn storybook                                    # Dev storybook on :6006
 ```
 
 ### Linting / typecheck / formatting
 
-```
-yarn lint                 # ESLint + Stylelint
-yarn fix                  # Auto-fix JS + CSS
-yarn typecheck            # tsc --noEmit
-yarn format               # oxfmt
-uv run ruff check app/python/   # Python linting
-uv run ruff format app/python/  # Python formatting
-uv run mypy app/python          # Python type checking
+```bash
+yarn lint && yarn typecheck        # Full JS pre-PR check
+yarn fix                           # Auto-fix JS + CSS
+uv run ruff check app/python/      # Python linting
+uv run ruff format app/python/     # Python formatting
+uv run mypy app/python             # Python type checking
 ```
 
 ### i18n
 
+```bash
+yarn i18n:extract    # Extract frontend strings → en.json
 ```
-yarn i18n:extract                          # Extract frontend strings → en.json
+
+## Python backend architecture
+
+### Layering (strict — don't bypass)
+
+- **Routers** (`routers/`) — thin; delegate side effects to services
+- **Services** (`services/`) — all business logic and DB mutations; can enqueue jobs
+- **Policies** (`policies/`) — authorization checks; called from routers before services
+- **Schemas** (`schemas/`) — Pydantic response models; `serialize_account()` / `serialize_status()` are the canonical serializers
+- **Workers** (`workers/`) — arq background jobs (delivery, fanout, media processing)
+- **Models** (`models/`) — SQLAlchemy ORM; no business logic
+
+### Key files
+
+- `main.py` — FastAPI app factory, mounts all routers, registers static file mounts, lifespan hook
+- `settings.py` — reads all env vars via `@lru_cache`; reset in tests with `get_settings.cache_clear()`
+- `deps.py` — FastAPI `Depends()` chain: `DBSession`, `BearerToken` → `OptionalAuth` → `CurrentAuth` → `CurrentAccount` / `CurrentUser`
+- `db.py` — async SQLAlchemy engine; `dispose_engine()` called on shutdown
+
+### Static file mount order (critical)
+
+`main.py` mounts in this order — later mounts won't shadow earlier ones:
+
+1. All API/auth/federation routers
+2. Named public subdirs: `/sounds/`, `/emoji/`, `/avatars/`, `/headers/`, `/packs/`, `/system/`, `/ocr/`
+3. SPA catch-all last: `GET /` and `GET /{path:path}` → React shell HTML
+
+The SPA shell (`routers/web.py`) also handles `GET /web/{path:path}` → 302 redirect to `/{path}` (mirroring the original Rails route so React Router sees clean paths without a `/web` basename).
+
+### Authentication
+
+Two auth paths resolve to the same `AuthContext(access_token, application, user, account)`:
+
+1. **API** — `Authorization: Bearer <token>` header, validated by `auth/tokens.py`. Checks: exists, not revoked, not expired, user is functional (confirmed + approved + not disabled).
+2. **Browser SPA** — `_mastodon_session` cookie (HMAC-signed base64 JSON containing `user_id`, `account_id`, `token`). Read by `routers/web.py` to embed token in `initial-state` so the React SPA bootstraps with auth.
+
+`OptionalAuth` returns `None` for unauthenticated requests. It only reads Bearer tokens, not the session cookie. Session cookies are only consumed by `routers/web.py` and `routers/auth_web.py`.
+
+Scope check: `has_scope("read:statuses")` passes for both `read:statuses` and parent scope `read`.
+
+### Settings / domain config
+
+Key env vars (see `settings.py` for full list):
+
+- `LOCAL_DOMAIN` — canonical hostname (default `localhost:3000`)
+- `WEB_DOMAIN` — optional CDN/public alias; `effective_web_domain` returns this if set, else `LOCAL_DOMAIN`
+- `RAILS_ENV` / `NODE_ENV` — controls scheme (`https` in production, `http` otherwise)
+- `MEDIA_ROOT` — filesystem path for local media storage (default `public/system`)
+- `S3_ENABLED`, `S3_BUCKET`, `S3_REGION`, … — S3 config; if enabled without bucket/region, `get_storage()` raises immediately
+
+URL helpers: `settings.base_url("/path")` → `<scheme>://<effective_web_domain>/path`.
+
+### Media storage
+
+`app/python/storage/__init__.py` provides a `Storage` protocol with `write(key, data)`, `read(key)`, `url(key)`.
+
+- **LocalStorage** — writes to `<media_root>/<key>`, serves at `<scheme>://<effective_web_domain>/system/<key>`
+- **S3Storage** — aiobotocore-backed; public URLs use `alias_host` (CDN) if set
+
+Storage key convention (Paperclip-style):
+
+- Media: `media_attachments/files/<account_id>/<variant>/<filename>`
+- Avatars: `accounts/avatars/<account_id>/{original,static}/<filename>`
+- Headers: `accounts/headers/<account_id>/{original,static}/<filename>`
+
+When uploading avatar/header, always write **both** `original/` and `static/` paths — the SPA requests both URLs.
+
+`app/python/lib/asset_urls.py` builds public URLs:
+
+- If `remote_url` set → use it as-is (remote actor)
+- If `file_name` set → `/system/accounts/{kind}s/{id}/{size}/{file_name}`
+- Otherwise → fallback missing-asset URL (`/avatars/original/missing.png`, etc.)
+
+### Multipart vs JSON in profile/account endpoints
+
+`PATCH /api/v1/profile` and `PATCH /api/v1/accounts/update_credentials` accept **both** content types:
+
+- `multipart/form-data` — sent by the SPA when uploading avatar/header files
+- `application/json` — sent by API clients and tests
+
+Pattern used (detect at runtime):
+
+```python
+content_type = request.headers.get("content-type", "")
+if "multipart/form-data" in content_type:
+    form = await request.form()
+    data = {k: v for k, v in form.items() if not hasattr(v, "read")}
+    # file fields have .read(); check hasattr, not truthiness
+else:
+    data = json.loads(await request.body())
 ```
 
-## Architecture notes
+### ORM conventions
 
-### Backend layering (don't bypass)
+All relationships use `lazy="joined"` (single SQL JOIN, not deferred SELECT). This means:
 
-Routers should be thin and delegate to **services** (`app/python/services/`). Side-effecting operations go through a service, not directly in routers or models. Background fan-out work goes through **arq workers** (`app/python/workers/`). Authorization is enforced by **policies** (`app/python/policies/`). JSON API responses use **Pydantic schemas** (`app/python/schemas/`).
+- Post-query, related objects are already populated — serializers can access them directly
+- After **manually constructing** a model (not from a query), related fields are NOT populated — call `await session.refresh(obj)` after commit before serializing
 
-### ActivityPub
+`Discardable` mixin adds `deleted_at` for soft-deletes. **No implicit filter** — queries must explicitly add `Status.kept_clause()` / `.where(Status.deleted_at.is_(None))`. This is intentional to catch missing filters in code review.
 
-Federation logic lives under `app/python/federation/`. Inbound activities are processed by `federation/activity.py`. Outbound delivery goes through `workers/delivery.py`. HTTP signatures use RFC 9421 via `federation/signatures.py`. When changing federated behavior, check whether both inbound parsing and outbound serialization need updates.
+Counter-cache updates use `common/counter_cache.py → adjust_counter(session, table, row_id, column, delta)` which wraps the UPDATE in a Postgres advisory lock to prevent race conditions.
 
-### Search (Elasticsearch)
+### Snowflake IDs
 
-Search is optional at runtime — code must degrade gracefully without ES. Index updates are async via arq.
+48-bit millisecond timestamp + 16-bit tail (DB sequence bits). `common/snowflake.py → now_id()` is the Python-side generator used in tests. Production uses the Postgres `timestamp_id(<table>)` function. `tests/common/test_snowflake.py` validates parity — keep it green.
 
-### Frontend (`app/javascript/mastodon/`)
+### Pagination cursors
 
-- **Redux store** built with both legacy `redux-immutable` reducers (Immutable.js Records/Maps) and newer `@reduxjs/toolkit` slices. New state should use Toolkit slices and plain JS objects, but legacy Immutable state still dominates timelines, statuses, accounts.
-- **Actions** in `actions/` — older files are `.js` thunks dispatching `*_REQUEST` / `*_SUCCESS` / `*_FAIL`; newer `*_typed.ts` use `createAppAsyncThunk`. Mirror existing style in the file you're editing.
-- **Features** in `features/` are route-level views; `containers/` are connected wrappers; `components/` are presentational. `react-router` v5 routes live in `features/ui/`.
-- **API** calls go through `api.ts` (axios instance with auth + base URL). Don't fetch directly.
-- **i18n**: wrap user-facing strings with `react-intl` (`<FormattedMessage>` / `defineMessages`). After adding strings, run `yarn i18n:extract`.
-- **Models**: `models/` contains both Immutable Record factories (older) and plain TS types (newer).
+- `max_id` → `id < max_id` (older)
+- `min_id` → `id > min_id`, ascending, reversed by caller ("load newer")
+- `since_id` → `id > since_id`, ascending (not used for "load newer")
+- Link header built from first/last IDs in result: `next=max_id=<last>`, `prev=min_id=<first>`
 
-### Streaming server (`streaming/`)
+### ActivityPub / federation
 
-Separate yarn workspace, separate `tsconfig.json` and `eslint.config.mjs`. Reads directly from PG (`streaming/database.js`) and subscribes to Redis pub/sub channels published by FastAPI. When adding a new timeline/stream, both FastAPI publish path (`services/fanout.py`) and the streaming server's channel handling need updates.
+- `federation/activity.py` — inbound activity dispatch
+- `federation/signatures.py` — HTTP signatures (RFC draft-cavage-10, not RFC 9421; Fediverse settled on the older variant)
+- `workers/delivery.py` — outbound signed POST to remote inboxes
+- Signature covers: `(request-target)`, `host`, `date`, `digest`, `content-type`; digest is SHA-256 of body
 
-### Database conventions
+When changing federated behavior, update both the inbound parser (`federation/activity.py`) and outbound serializer (`federation/serializers.py`).
 
-Use Alembic for all migrations (`alembic/`). For large tables use `CREATE INDEX CONCURRENTLY` and batched backfills. Never write long-locking DDL.
+### Job queue
 
-## Python backend layout
+`queue.py` defines `Enqueuer` protocol: `async def enqueue(function_name, *args)`. Tests use `FakeEnqueuer` which records `(function_name, args)` tuples for assertion without Redis.
 
-- `app/python/` — FastAPI app. `main.py` (factory), `settings.py` (reads deployment ENV vars), `db.py` (async SQLAlchemy), `deps.py` (FastAPI deps), `common/` (snowflake, discard, pagination, counter_cache).
-- `alembic/` — async Alembic env pointing at Postgres.
-- `tests/` — pytest (asyncio_mode=auto). `tests/common/test_snowflake.py` is the parity test for ID generation — keep it green.
-- `pyproject.toml` + `uv.lock` — managed with [`uv`](https://docs.astral.sh/uv/). Install: `uv sync`. Add a runtime dep: `uv add <pkg>`. Add a dev dep: `uv add --group dev <pkg>`.
+## Frontend architecture
 
-Ad-hoc commands inside the venv go through `uv run` — e.g. `uv run pytest`, `uv run mypy app/python`, `uv run alembic upgrade head`.
+- **Redux store** — legacy `redux-immutable` Immutable.js Records + newer `@reduxjs/toolkit` slices. New state → Toolkit slices + plain JS. Legacy Immutable state dominates timelines/statuses/accounts.
+- **Actions** — older `.js` files dispatch `*_REQUEST` / `*_SUCCESS` / `*_FAIL`; newer `*_typed.ts` use `createAppAsyncThunk`. Mirror existing style per file.
+- **Routes** — React Router v5 in `features/ui/index.jsx`. Routes are clean paths without `/web` prefix.
+- **API calls** — all go through `api.ts` (axios instance); don't fetch directly.
+- **Modal system** — `features/ui/components/modal_root.jsx` renders modals via `Bundle` (lazy loader). Only passes `ref` to class components and `forwardRef` components — not to plain function components.
+- **i18n** — wrap user-visible strings with `react-intl`. Run `yarn i18n:extract` after adding strings. Don't commit non-`en.json` locale files (Crowdin manages them).
 
-When adding a new endpoint: translate implicit side-effects into explicit service calls (do NOT use SQLAlchemy events for business logic), and add tests in `tests/routers/`.
+## Test setup
+
+- **SQLite in-memory** — all Python tests use `:memory:` SQLite with raw schema creation (not Alembic migrations). `Base.metadata.create_all()` at fixture setup.
+- **Fixtures** (`tests/conftest.py`) — `seed_data` dict of factory functions (`make_account`, `make_user`, `make_token`, `make_status`, …); call them and `session.add()` manually per test.
+- **FakeEnqueuer** — replaces Redis enqueue; assert on `fake_enqueuer.calls` list of `(function_name, args)`.
+- **bcrypt rounds** — tests use `rounds=4` (production uses 12) for speed.
+- `tests/common/test_snowflake.py` — parity test for ID generation; must stay green.
 
 ## Conventions and gotchas
 
 - Node pinned by `.nvmrc` (24.15). Use nvm or equivalent.
-- The `test` yarn script runs `lint + typecheck + test:js run` — that's the full JS pre-PR check.
-- Don't commit changes to `app/javascript/mastodon/locales/*.json` other than `en.json` — translations come from Crowdin.
-- System specs require Chrome/Chromium and a running streaming server.
+- `yarn test` runs `lint + typecheck + test:js run` — the full JS pre-PR check.
+- `pyproject.toml` + `uv.lock` managed with `uv`. Add runtime dep: `uv add <pkg>`. Dev dep: `uv add --group dev <pkg>`.
+- Don't commit locale files other than `en.json`.
 - Mastodon is **AGPLv3**. AI-assisted contributions are governed by the project's [AI Contribution Policy](https://github.com/mastodon/.github/blob/main/AI_POLICY.md).

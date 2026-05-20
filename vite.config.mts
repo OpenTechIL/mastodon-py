@@ -114,6 +114,8 @@ export const config: UserConfigFnPromise = async ({ mode, command }) => {
         protocol: 'ws',
       },
       port: 3036,
+      // Allow access when proxied through nginx (Docker / native dev).
+      allowedHosts: true,
     },
     build: {
       commonjsOptions: { transformMixedEsModules: true },

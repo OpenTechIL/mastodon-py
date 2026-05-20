@@ -55,4 +55,21 @@ export const selectSettingsNotificationsMinimizeFilteredBanner = (
 export const selectSettingsNotificationsGroupFollows = (state: RootState) =>
   state.settings.getIn(['notifications', 'group', 'follow']) as boolean;
 
+export const selectAppearanceColorScheme = (state: RootState) =>
+  (state.settings.getIn(['appearance', 'colorScheme']) as
+    | 'dark'
+    | 'auto'
+    | 'light'
+    | undefined) ?? 'auto';
+
+export const selectAppearanceHighContrast = (state: RootState) =>
+  !!(state.settings.getIn(['appearance', 'highContrast']) as
+    | boolean
+    | undefined);
+
+export const selectAppearanceReduceMotion = (state: RootState) =>
+  !!(state.settings.getIn(['appearance', 'reduceMotion']) as
+    | boolean
+    | undefined);
+
 /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */

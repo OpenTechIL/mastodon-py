@@ -12,10 +12,40 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.python.db import Base
+
+
+class _StringList(TypeDecorator):
+    """varchar[] on Postgres, JSON-encoded text on SQLite (for tests)."""
+    impl = Text
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import ARRAY
+            return dialect.type_descriptor(ARRAY(String))
+        return dialect.type_descriptor(Text())
+
+    def process_bind_param(self, value, dialect):
+        if dialect.name == "postgresql":
+            return value
+        if value is None:
+            return None
+        import json
+        return json.dumps(value)
+
+    def process_result_value(self, value, dialect):
+        if dialect.name == "postgresql":
+            return value
+        if value is None:
+            return None
+        import json
+        return json.loads(value)
+
 
 if TYPE_CHECKING:
     from app.python.models.account import Account
@@ -44,6 +74,7 @@ class User(Base):
 
     role_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     locale: Mapped[str | None] = mapped_column(String, nullable=True)
+    chosen_languages: Mapped[list[str] | None] = mapped_column(_StringList, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)

@@ -398,3 +398,51 @@ async def remove_status(
     )
     await session.commit()
     return {}
+
+
+# ---------- v1 compatibility ----------
+
+v1_router = APIRouter(prefix="/api/v1/filters", tags=["filters"])
+
+
+class _FilterV1(BaseModel):
+    id: str
+    phrase: str
+    context: list[str]
+    expires_at: datetime | None
+    filter_action: str
+    irreversible: bool
+    whole_word: bool
+
+
+@v1_router.get("", response_model=list[_FilterV1])
+async def index_v1(session: DBSession, viewer: CurrentAccount) -> list[_FilterV1]:
+    """v1 flat filter list — first keyword becomes the phrase."""
+    rows = (
+        await session.execute(
+            select(CustomFilter)
+            .where(CustomFilter.account_id == viewer.id)
+            .order_by(CustomFilter.id.asc())
+        )
+    ).scalars().all()
+    result = []
+    for f in rows:
+        kws = (
+            await session.execute(
+                select(CustomFilterKeyword)
+                .where(CustomFilterKeyword.custom_filter_id == f.id)
+                .limit(1)
+            )
+        ).scalars().all()
+        phrase = kws[0].keyword if kws else ""
+        whole_word = kws[0].whole_word if kws else False
+        result.append(_FilterV1(
+            id=str(f.id),
+            phrase=phrase,
+            context=f.context or [],
+            expires_at=f.expires_at,
+            filter_action=f.action or "warn",
+            irreversible=f.action == "hide",
+            whole_word=whole_word,
+        ))
+    return result

@@ -87,6 +87,42 @@ async def index(
     return [_serialize(a, read=a.id in read_ids) for a in rows]
 
 
+@router.put("/{announcement_id}/reactions/{name}", status_code=status.HTTP_200_OK)
+async def put_reaction(
+    announcement_id: int,
+    name: str,
+    session: DBSession,
+    viewer: CurrentAccount,
+) -> dict[str, Any]:
+    """Add an emoji reaction to an announcement. Stub — stores nothing."""
+    row = (
+        await session.execute(
+            select(Announcement).where(Announcement.id == announcement_id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
+    return {}
+
+
+@router.delete("/{announcement_id}/reactions/{name}", status_code=status.HTTP_200_OK)
+async def delete_reaction(
+    announcement_id: int,
+    name: str,
+    session: DBSession,
+    viewer: CurrentAccount,
+) -> dict[str, Any]:
+    """Remove an emoji reaction from an announcement. Stub."""
+    row = (
+        await session.execute(
+            select(Announcement).where(Announcement.id == announcement_id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found")
+    return {}
+
+
 @router.post("/{announcement_id}/dismiss", status_code=status.HTTP_200_OK)
 async def dismiss(
     announcement_id: int,

@@ -247,3 +247,33 @@ async def suggestions_index() -> list[dict[str, Any]]:
 @router.get("/api/v2/suggestions", response_model=list[dict[str, Any]])
 async def suggestions_index_v2() -> list[dict[str, Any]]:
     return []
+
+
+@router.delete("/api/v1/suggestions/{account_id}", status_code=200)
+async def dismiss_suggestion(account_id: int) -> dict:
+    return {}
+
+
+@router.delete("/api/v2/suggestions/{account_id}", status_code=200)
+async def dismiss_suggestion_v2(account_id: int) -> dict:
+    return {}
+
+
+# ---------- /api/v1/emails ----------
+
+@router.get("/api/v1/emails/check_confirmation", response_model=dict)
+async def check_email_confirmation() -> dict:
+    """Stub — email confirmation flow not yet ported."""
+    return {"confirmed": True}
+
+
+@router.post("/api/v1/emails/confirmations", status_code=200)
+async def request_email_confirmation() -> dict:
+    return {}
+
+
+# ---------- /api/v1/donation_campaigns ----------
+
+@router.get("/api/v1/donation_campaigns", response_model=list)
+async def donation_campaigns() -> list:
+    return []

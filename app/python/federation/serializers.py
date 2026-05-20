@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.python.lib.asset_urls import account_uri
+from app.python.lib.asset_urls import account_uri, _asset_host  # noqa: PLC2701
 from app.python.models import Visibility
 
 if TYPE_CHECKING:
@@ -50,12 +50,17 @@ def _audience(status: Status, author_uri: str) -> tuple[list[str], list[str]]:
     return [], []
 
 
-def serialize_note(status: Status, author: Account) -> dict:
-    """Status → AP Note dict.
+_MEDIA_TYPE_MAP = {
+    0: "image/jpeg",   # image
+    1: "image/gif",    # gifv
+    2: "video/mp4",    # video
+    3: "audio/mpeg",   # audio
+    4: "application/octet-stream",  # unknown
+}
 
-    Minimum viable port — no mentions, no tag array, no attachments.
-    Those serialize alongside their inbound parsers when each lands.
-    """
+
+def serialize_note(status: "Status", author: "Account") -> dict:
+    """Status → AP Note dict."""
     author_uri = account_uri(author)
     to, cc = _audience(status, author_uri)
     note: dict = {
@@ -73,12 +78,73 @@ def serialize_note(status: Status, author: Account) -> dict:
         note["contentMap"] = {status.language: status.text}
     if status.url:
         note["url"] = status.url
+
+    # inReplyTo: try the parent's uri; fall back to constructing from id
     if status.in_reply_to_id:
-        # We have the parent's id but not necessarily its uri here; the
-        # caller fetches it when needed. The outbox listing skips
-        # threading metadata for now — we'll fill `inReplyTo` once the
-        # batched serializer ports.
-        pass
+        parent_uri = getattr(status, "in_reply_to_uri", None)
+        if not parent_uri and hasattr(status, "reblog"):
+            parent_uri = None  # can't derive without a DB round-trip here
+        if parent_uri:
+            note["inReplyTo"] = parent_uri
+        else:
+            # Synthesise a local URI if the parent is local; skip if remote
+            # (we'd need the parent row to know its URI).
+            in_reply_to_account_id = getattr(status, "in_reply_to_account_id", None)
+            if in_reply_to_account_id is None:
+                host = _asset_host()
+                note["inReplyTo"] = f"{host}/users/unknown/statuses/{status.in_reply_to_id}"
+
+    # tag: mentions as Link objects + hashtags
+    tags: list[dict] = []
+    mentions = getattr(status, "mentions", None)
+    if mentions:
+        for mention in mentions:
+            mentioned = getattr(mention, "account", None)
+            if mentioned is not None:
+                m_uri = account_uri(mentioned)
+                m_url = getattr(mentioned, "url", None) or m_uri
+                tags.append({
+                    "type": "Mention",
+                    "href": m_uri,
+                    "name": f"@{mentioned.username}" if not mentioned.domain
+                            else f"@{mentioned.username}@{mentioned.domain}",
+                })
+                # ensure mentioned actor is in cc for non-public posts
+                if m_uri not in cc and m_uri not in to:
+                    cc.append(m_uri)
+    status_tags = getattr(status, "tags", None)
+    if status_tags:
+        host = _asset_host()
+        for tag in status_tags:
+            tags.append({
+                "type": "Hashtag",
+                "href": f"{host}/tags/{tag.name}",
+                "name": f"#{tag.name}",
+            })
+    if tags:
+        note["tag"] = tags
+
+    # attachment: media attachments
+    media = getattr(status, "media_attachments", None)
+    if media:
+        attachments = []
+        for att in media:
+            mt = att.file_content_type or _MEDIA_TYPE_MAP.get(att.type, "application/octet-stream")
+            url = att.remote_url or (
+                f"{_asset_host()}/system/media_attachments/files/{att.id}/original/{att.file_file_name}"
+                if att.file_file_name else ""
+            )
+            if url:
+                attachments.append({
+                    "type": "Document",
+                    "mediaType": mt,
+                    "url": url,
+                    "name": att.description or None,
+                    "blurhash": getattr(att, "blurhash", None),
+                })
+        if attachments:
+            note["attachment"] = attachments
+
     return note
 
 

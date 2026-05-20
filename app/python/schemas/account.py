@@ -57,6 +57,9 @@ class Account_(BaseModel):
     # Composite/derived fields whose data sources land later.
     fields: list[AccountField] = Field(default_factory=list)
     emojis: list[Any] = Field(default_factory=list)
+    # Credential-only fields (None for public account lookups)
+    source: dict[str, Any] | None = None
+    role: dict[str, Any] | None = None
 
 
 def serialize_account(account: Account) -> Account_:

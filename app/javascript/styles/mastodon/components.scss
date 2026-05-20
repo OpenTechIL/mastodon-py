@@ -3797,6 +3797,62 @@ a.account__display-name {
   }
 }
 
+// ── Appearance (theme / contrast / motion) toolbar ────────────────────────────
+
+.navigation-panel__appearance {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-border-primary);
+  flex: 0 0 auto;
+}
+
+.appearance-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-primary);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &__label {
+    white-space: nowrap;
+  }
+
+  &:hover {
+    background: var(--color-surface-overlay-primary-pressed);
+    color: var(--color-text-primary);
+    border-color: var(--color-border-secondary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+
+  &.active,
+  &.dark,
+  &.light {
+    background: var(--color-surface-overlay-primary-pressed);
+    color: var(--color-text-primary);
+    border-color: var(--color-accent-color);
+  }
+}
+
 .drawer__pager {
   box-sizing: border-box;
   padding: 0;

@@ -67,6 +67,10 @@ class Status_(BaseModel):
     card: Any = None
     poll: Any = None
     filtered: list[Any] = Field(default_factory=list)
+    quotes_count: int = 0
+    tagged_collections: list[Any] = Field(default_factory=list)
+    quote: Any = None
+    quote_approval: dict[str, Any] | None = None
 
 
 def serialize_status(
@@ -173,4 +177,8 @@ def serialize_status(
         mentions=mentions_for_status,
         media_attachments=media_for_status,
         poll=poll_for_status,
+        quotes_count=stat.quotes_count if stat else 0,
+        tagged_collections=[],
+        quote=None,
+        quote_approval=None,
     )

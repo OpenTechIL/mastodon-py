@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from app.python.models.account import Account
 from app.python.models.account_conversation import AccountConversation
+from app.python.models.account_statuses_cleanup_policy import AccountStatusesCleanupPolicy
 from app.python.models.account_domain_block import AccountDomainBlock
 from app.python.models.account_note import AccountNote
 from app.python.models.account_pin import AccountPin
@@ -59,11 +60,14 @@ from app.python.models.status_tag import StatusTag
 from app.python.models.tag import Tag
 from app.python.models.tag_follow import TagFollow
 from app.python.models.user import User
+from app.python.models.user_role import UserRole
+from app.python.models.web_setting import WebSetting
 
 __all__ = [
     "ACTIVITY_TYPE_FOR",
     "Account",
     "AccountConversation",
+    "AccountStatusesCleanupPolicy",
     "AccountDomainBlock",
     "AccountNote",
     "AccountPin",
@@ -111,5 +115,7 @@ __all__ = [
     "Tag",
     "TagFollow",
     "User",
+    "UserRole",
+    "WebSetting",
     "Visibility",
 ]

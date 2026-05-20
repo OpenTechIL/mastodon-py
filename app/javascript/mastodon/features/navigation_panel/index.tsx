@@ -58,6 +58,7 @@ import { FollowedTagsPanel } from './components/followed_tags_panel';
 import { ListPanel } from './components/list_panel';
 import { MoreLink } from './components/more_link';
 import { SignInBanner } from './components/sign_in_banner';
+import { ThemeToggle } from './components/theme_toggle';
 import { Trends } from './components/trends';
 
 const messages = defineMessages({
@@ -386,6 +387,8 @@ export const NavigationPanel: React.FC<{ multiColumn?: boolean }> = ({
       </div>
 
       <div className='flex-spacer' />
+
+      <ThemeToggle />
 
       <Trends />
     </div>

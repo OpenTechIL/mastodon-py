@@ -160,3 +160,19 @@ async def tag_timeline(
         session, viewer_account_id, status_ids_for_batch(ordered)
     )
     return [serialize_status(s, relationships=relationships) for s in ordered]
+
+
+@router.get("/api/v1/followed_tags", response_model=list[Tag_])
+async def followed_tags(
+    session: DBSession,
+    account: CurrentAccount,
+) -> list[Tag_]:
+    """Tags the authenticated user follows."""
+    stmt = (
+        select(Tag)
+        .join(TagFollow, TagFollow.tag_id == Tag.id)
+        .where(TagFollow.account_id == account.id)
+        .order_by(Tag.name)
+    )
+    tags = (await session.execute(stmt)).scalars().all()
+    return [serialize_tag(t, following=True) for t in tags]

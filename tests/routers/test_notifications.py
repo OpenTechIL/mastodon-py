@@ -240,3 +240,96 @@ async def test_locked_target_generates_follow_request_notification(
     body = response.json()
     assert len(body) == 1
     assert body[0]["type"] == "follow_request"
+
+
+@pytest.mark.asyncio
+async def test_get_notification_policy_returns_defaults(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    for url in ("/api/v1/notifications/policy", "/api/v2/notifications/policy"):
+        response = await client.get(url, headers=_AUTH)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["filter_not_following"] is False
+        assert body["filter_not_followers"] is False
+        assert body["filter_new_accounts"] is False
+        assert body["filter_private_mentions"] is True
+        assert "summary" in body
+
+
+@pytest.mark.asyncio
+async def test_put_notification_policy_persists_and_returns(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    for url in ("/api/v1/notifications/policy", "/api/v2/notifications/policy"):
+        # Reset by sending known values first
+        await client.put(
+            url,
+            json={"filter_not_following": False, "filter_private_mentions": True},
+            headers=_AUTH,
+        )
+
+        response = await client.put(
+            url,
+            json={"filter_not_following": True, "filter_new_accounts": True},
+            headers=_AUTH,
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["filter_not_following"] is True
+        assert body["filter_new_accounts"] is True
+        # unchanged fields keep their prior value
+        assert body["filter_not_followers"] is False
+
+        # GET must reflect the saved state
+        get_resp = await client.get(url, headers=_AUTH)
+        assert get_resp.json()["filter_not_following"] is True
+        assert get_resp.json()["filter_new_accounts"] is True
+
+
+@pytest.mark.asyncio
+async def test_put_partial_update_preserves_other_fields(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    # First PUT: enable filter_not_followers
+    await client.put(
+        "/api/v1/notifications/policy",
+        json={"filter_not_followers": True},
+        headers=_AUTH,
+    )
+    # Second PUT: only change filter_new_accounts — filter_not_followers must survive
+    response = await client.put(
+        "/api/v1/notifications/policy",
+        json={"filter_new_accounts": True},
+        headers=_AUTH,
+    )
+    body = response.json()
+    assert body["filter_not_followers"] is True
+    assert body["filter_new_accounts"] is True
+
+
+@pytest.mark.asyncio
+async def test_policy_is_per_user(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    # Alice enables a filter
+    await client.put(
+        "/api/v1/notifications/policy",
+        json={"filter_not_following": True},
+        headers=_AUTH,
+    )
+    # Bob's policy should still be at defaults
+    bob_resp = await client.get("/api/v1/notifications/policy", headers=_BOB_AUTH)
+    assert bob_resp.json()["filter_not_following"] is False

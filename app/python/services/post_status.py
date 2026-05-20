@@ -203,6 +203,10 @@ async def post_status(
 
     await session.commit()
 
+    # Live streaming: publish to Redis so the streaming server pushes to subscribed clients.
+    from app.python.services.streaming import publish_status  # noqa: PLC0415
+    await publish_status(session, row, author)
+
     # Outbound federation: deliver to remote followers after commit.
     # DIRECT/LIMITED don't fan out via followers — mentions handle
     # those recipients, and mentions isn't wired in yet.

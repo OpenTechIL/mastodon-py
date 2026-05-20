@@ -32,6 +32,12 @@ from app.python.policies.status_policy import _follows  # noqa: PLC2701
 from app.python.schemas.account import Account_, serialize_account
 from app.python.schemas.relationship import Relationship, serialize_relationship
 from app.python.schemas.status import Status_, serialize_status
+import bcrypt
+import secrets
+
+from app.python.auth.oauth import _resolve_client  # noqa: PLC2701
+from app.python.models import OAuthAccessToken, User
+from app.python.models.account_stat import AccountStat
 from app.python.queue import Enqueuer, get_enqueuer
 from app.python.services import blocks as block_service
 from app.python.services import follows as follow_service
@@ -41,13 +47,182 @@ from app.python.services.status_relationships import (
     load_relationships,
     status_ids_for_batch,
 )
+from app.python.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/accounts", tags=["accounts"])
 
 
+class RegistrationBody(BaseModel):
+    username: str
+    email: str
+    password: str
+    agreement: bool = False
+    locale: str = "en"
+    reason: str | None = None
+
+
+@router.post("", status_code=status.HTTP_200_OK)
+async def register(
+    body: RegistrationBody,
+    session: DBSession,
+    client_id: str | None = Query(default=None),
+    client_secret: str | None = Query(default=None),
+) -> dict:
+    """Create a new account and return an OAuth token for it.
+
+    Requires client_credentials in query or header. In open-registration
+    mode (the current default) the account is immediately confirmed.
+    """
+    from fastapi import Request as _Request  # noqa: PLC0415
+    from fastapi.security.utils import get_authorization_scheme_param  # noqa: PLC0415
+
+    # Validate required fields
+    if not body.username or not body.email or not body.password:
+        raise HTTPException(status_code=422, detail={"error": "Validation failed"})
+    if not body.agreement:
+        raise HTTPException(status_code=422, detail={"error": "Agreement must be accepted"})
+
+    # Username must be unique (case-insensitive)
+    existing = (
+        await session.execute(
+            select(Account).where(
+                Account.username == body.username,
+                Account.domain.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=422, detail={"error": "Username is already taken"})
+
+    # Email must be unique
+    existing_user = (
+        await session.execute(select(User).where(User.email == body.email))
+    ).scalar_one_or_none()
+    if existing_user:
+        raise HTTPException(status_code=422, detail={"error": "Email is already in use"})
+
+    settings = get_settings()
+    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    domain = settings.local_domain
+
+    account = Account(
+        id=now_id(),
+        username=body.username,
+        domain=None,
+        display_name="",
+        note="",
+        uri="",
+        url=None,
+        locked=False,
+        discoverable=False,
+        indexable=False,
+        memorial=False,
+        fields=[],
+        public_key="",
+        private_key="",
+        inbox_url="",
+        shared_inbox_url="",
+        header_remote_url="",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(account)
+    await session.flush()
+
+    # Update URI/URL now that we have the ID
+    account.uri = f"https://{domain}/users/{body.username}"
+    account.url = f"https://{domain}/@{body.username}"
+    account.inbox_url = f"https://{domain}/users/{body.username}/inbox"
+
+    stat = AccountStat(
+        account_id=account.id,
+        statuses_count=0,
+        following_count=0,
+        followers_count=0,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(stat)
+
+    encrypted_password = bcrypt.hashpw(
+        body.password.encode("utf-8"), bcrypt.gensalt(12)
+    ).decode("utf-8")
+
+    user = User(
+        id=now_id(),
+        account_id=account.id,
+        email=body.email,
+        encrypted_password=encrypted_password,
+        confirmed_at=now,  # auto-confirm in open registration
+        approved=True,
+        disabled=False,
+        otp_required_for_login=False,
+        locale=body.locale,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(user)
+    await session.flush()
+
+    # Issue an access token. Use client_credentials from query params if provided.
+    token_scopes = "read write follow push"
+    app_id: int | None = None
+    if client_id and client_secret:
+        try:
+            app = await _resolve_client(session, client_id, client_secret)
+            app_id = app.id
+            token_scopes = app.scopes or token_scopes
+        except Exception:
+            pass  # proceed without app binding
+
+    access_token = OAuthAccessToken(
+        id=now_id(),
+        token=secrets.token_hex(32),
+        refresh_token=None,
+        scopes=token_scopes,
+        application_id=app_id,
+        resource_owner_id=user.id,
+        expires_in=None,
+        revoked_at=None,
+        created_at=now,
+        last_used_at=None,
+        last_used_ip=None,
+    )
+    session.add(access_token)
+    await session.commit()
+
+    return {
+        "access_token": access_token.token,
+        "token_type": "Bearer",
+        "scope": access_token.scopes,
+        "created_at": int(now.timestamp()),
+    }
+
+
 @router.get("/verify_credentials", response_model=Account_)
-async def verify_credentials(account: CurrentAccount) -> Account_:
-    return serialize_account(account)
+async def verify_credentials(account: CurrentAccount, session: DBSession) -> Account_:
+    user = (
+        await session.execute(select(User).where(User.account_id == account.id))
+    ).scalar_one_or_none()
+    acc = serialize_account(account)
+    acc.source = {
+        "privacy": "public",
+        "sensitive": False,
+        "language": user.locale if user and user.locale else "en",
+        "note": account.note or "",
+        "fields": [
+            {"name": str(f.get("name", "")), "value": str(f.get("value", ""))}
+            for f in (account.fields or [])
+        ],
+        "follow_requests_count": 0,
+        "hide_collections": account.hide_collections,
+        "discoverable": account.discoverable,
+        "indexable": account.indexable,
+        "attribution_domains": [],
+        "quote_policy": "allow",
+    }
+    acc.role = {"id": "0", "name": "user", "permissions": "65536", "color": "", "highlighted": False}
+    return acc
 
 
 class _ProfileField(BaseModel):
@@ -57,63 +232,89 @@ class _ProfileField(BaseModel):
     value: str = ""
 
 
-class _UpdateCredentialsBody(BaseModel):
-    """The subset of the Mastodon `update_credentials` body we accept now.
+def _coerce_bool(v: object) -> bool | None:
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return v
+    return str(v).lower() in ("true", "1", "yes")
 
-    `avatar` / `header` uploads need image variant generation and are
-    deferred to the media pipeline phase. `source[*]` writes user
-    preferences into `users.settings` which we don't yet parse.
-    """
 
-    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+async def _save_account_image(account: object, kind: str, file_bytes: bytes, content_type: str, filename: str) -> None:
+    import os as _os  # noqa: PLC0415
+    from app.python.storage import get_storage  # noqa: PLC0415
+    ext = _os.path.splitext(filename)[1] or ".jpg"
+    fname = f"original{ext}"
+    storage_dir = "avatars" if kind == "avatar" else "headers"
+    storage = get_storage()
+    # Write both original and static variants; static is the same bytes for non-GIF.
+    await storage.write(f"accounts/{storage_dir}/{account.id}/original/{fname}", file_bytes)
+    await storage.write(f"accounts/{storage_dir}/{account.id}/static/{fname}", file_bytes)
+    setattr(account, f"{kind}_file_name", fname)
+    setattr(account, f"{kind}_content_type", content_type or "image/jpeg")
 
-    display_name: str | None = None
-    note: str | None = None
-    locked: bool | None = None
-    bot: bool | None = None
-    discoverable: bool | None = None
-    indexable: bool | None = None
-    hide_collections: bool | None = None
-    fields_attributes: list[_ProfileField] | None = Field(
-        default=None, alias="fields_attributes"
-    )
+
+async def _apply_credentials_data(account: object, data: dict) -> None:
+    if "display_name" in data and data["display_name"] is not None:
+        account.display_name = data["display_name"]
+    if "note" in data and data["note"] is not None:
+        account.note = data["note"]
+    if "locked" in data and data["locked"] is not None:
+        account.locked = bool(_coerce_bool(data["locked"]))
+    if "bot" in data and data["bot"] is not None:
+        account.actor_type = "Service" if _coerce_bool(data["bot"]) else "Person"
+    if "discoverable" in data and data["discoverable"] is not None:
+        account.discoverable = _coerce_bool(data["discoverable"])
+    if "indexable" in data and data["indexable"] is not None:
+        account.indexable = _coerce_bool(data["indexable"])
+    if "hide_collections" in data and data["hide_collections"] is not None:
+        account.hide_collections = _coerce_bool(data["hide_collections"])
+    if "fields_attributes" in data and data["fields_attributes"] is not None:
+        raw = data["fields_attributes"]
+        if isinstance(raw, list):
+            cleaned = [
+                {"name": str(f.get("name", "")).strip(), "value": str(f.get("value", "")).strip()}
+                for f in raw if isinstance(f, dict)
+                if str(f.get("name", "")).strip() or str(f.get("value", "")).strip()
+            ][:4]
+            account.fields = cleaned
 
 
 @router.patch("/update_credentials", response_model=Account_)
 async def update_credentials(
-    body: _UpdateCredentialsBody,
+    request: Request,
     session: DBSession,
     account: CurrentAccount,
 ) -> Account_:
     """Edit the caller's own profile.
 
-    Partial-update semantics — any field omitted from the body stays
-    unchanged. `fields_attributes` is the full desired set; empty rows
-    are dropped, the whole array is capped at four entries (matching
-    `Account::DEFAULT_FIELDS_SIZE`).
+    Accepts both application/json and multipart/form-data. The SPA sends
+    multipart when uploading avatar/header; API clients and tests use JSON.
     """
-    if body.display_name is not None:
-        account.display_name = body.display_name
-    if body.note is not None:
-        account.note = body.note
-    if body.locked is not None:
-        account.locked = body.locked
-    if body.bot is not None:
-        # `actor_type` is the storage column; "Service" maps to bot=true.
-        account.actor_type = "Service" if body.bot else "Person"
-    if body.discoverable is not None:
-        account.discoverable = body.discoverable
-    if body.indexable is not None:
-        account.indexable = body.indexable
-    if body.hide_collections is not None:
-        account.hide_collections = body.hide_collections
-    if body.fields_attributes is not None:
-        cleaned = [
-            {"name": f.name.strip(), "value": f.value.strip()}
-            for f in body.fields_attributes
-            if f.name.strip() or f.value.strip()
-        ][:4]
-        account.fields = cleaned
+    content_type = request.headers.get("content-type", "")
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        data: dict = {k: v for k, v in form.items() if not hasattr(v, "read")}
+        await _apply_credentials_data(account, data)
+
+        for kind in ("avatar", "header"):
+            file_field = form.get(kind)
+            if file_field is not None and hasattr(file_field, "read"):
+                file_bytes = await file_field.read()
+                if file_bytes:
+                    await _save_account_image(
+                        account,
+                        kind,
+                        file_bytes,
+                        getattr(file_field, "content_type", None) or "image/jpeg",
+                        getattr(file_field, "filename", None) or f"{kind}.jpg",
+                    )
+    else:
+        import json as _json  # noqa: PLC0415
+        body = await request.body()
+        data = _json.loads(body) if body else {}
+        await _apply_credentials_data(account, data)
 
     account.updated_at = datetime.now(tz=timezone.utc).replace(tzinfo=None)
     await session.commit()

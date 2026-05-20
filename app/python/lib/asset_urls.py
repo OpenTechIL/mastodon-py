@@ -30,7 +30,8 @@ _MISSING = {
 def _asset_host() -> str:
     settings = get_settings()
     host = settings.web_domain or settings.local_domain
-    return f"https://{host}"
+    scheme = "https" if settings.env == "production" else "http"
+    return f"{scheme}://{host}"
 
 
 def _url_for(account: Account, kind: AssetKind, size: SizeName) -> str:

@@ -13,6 +13,8 @@ into a single `app/python/lib/limits.py` module.
 
 from __future__ import annotations
 
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter
@@ -20,7 +22,8 @@ from pydantic import BaseModel
 from sqlalchemy import distinct, func, select
 
 from app.python.deps import DBSession
-from app.python.models import Account, Status, User
+from app.python.lib.asset_urls import _asset_host, avatar_url, header_url  # noqa: PLC2701
+from app.python.models import Account, AccountStat, Status, StatusStat, StatusTag, Tag, User, Visibility
 from app.python.settings import get_settings
 
 
@@ -72,6 +75,7 @@ class InstanceV2(BaseModel):
     registrations: dict[str, object]
     contact: dict[str, object]
     rules: list[dict]
+    api_versions: dict[str, int] = {"mastodon": 1}
 
 
 async def _stats(session) -> dict[str, int]:
@@ -99,13 +103,60 @@ async def _stats(session) -> dict[str, int]:
     }
 
 
+async def _contact_account(session) -> dict | None:
+    """Return the first local user's account as the instance contact.
+
+    In a real deployment this would come from Setting.site_contact_username.
+    Until the settings table is ported we fall back to the earliest local
+    account that has an associated user (i.e. is not a remote/system account).
+    """
+    row = (
+        await session.execute(
+            select(Account, AccountStat)
+            .join(User, User.account_id == Account.id)
+            .outerjoin(AccountStat, AccountStat.account_id == Account.id)
+            .where(Account.domain.is_(None))
+            .order_by(Account.id.asc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    account, stat = row
+    from app.python.lib.asset_urls import _asset_host
+    host = _asset_host()
+    return {
+        "id": str(account.id),
+        "username": account.username,
+        "acct": account.username,
+        "display_name": account.display_name or account.username,
+        "locked": account.locked,
+        "bot": account.bot,
+        "created_at": account.created_at.isoformat(timespec="seconds") + "Z" if account.created_at else None,
+        "note": account.note or "",
+        "url": f"{host}/@{account.username}",
+        "uri": f"{host}/users/{account.username}",
+        "avatar": avatar_url(account),
+        "avatar_static": avatar_url(account, static=True),
+        "header": header_url(account),
+        "header_static": header_url(account, static=True),
+        "followers_count": stat.followers_count if stat else 0,
+        "following_count": stat.following_count if stat else 0,
+        "statuses_count": stat.statuses_count if stat else 0,
+        "last_status_at": stat.last_status_at.date().isoformat() if (stat and stat.last_status_at) else None,
+        "emojis": [],
+        "fields": [],
+    }
+
+
 def _streaming_url() -> str:
     settings = get_settings()
-    return f"wss://{settings.effective_web_domain}"
+    scheme = "wss" if settings.env == "production" else "ws"
+    return f"{scheme}://{settings.effective_web_domain}"
 
 
 def _source_url() -> str:
-    return "https://github.com/mastodon/mastodon"
+    return "https://github.com/OpenTechIL/mastodon-py"
 
 
 def _configuration() -> dict[str, dict]:
@@ -147,6 +198,7 @@ def _configuration() -> dict[str, dict]:
 async def instance_v1(session: DBSession) -> InstanceV1:
     settings = get_settings()
     stats = await _stats(session)
+    contact = await _contact_account(session)
     return InstanceV1(
         uri=settings.local_domain,
         title=settings.local_domain,
@@ -161,15 +213,22 @@ async def instance_v1(session: DBSession) -> InstanceV1:
         registrations=True,
         approval_required=False,
         invites_enabled=False,
-        contact_account=None,
+        contact_account=contact,
         rules=[],
     )
+
+
+def _thumbnail(settings) -> dict[str, str]:
+    if os.path.isfile("public/preview.png"):
+        return {"url": settings.base_url("/preview.png")}
+    return {"url": ""}
 
 
 @router.get("/api/v2/instance", response_model=InstanceV2)
 async def instance_v2(session: DBSession) -> InstanceV2:
     settings = get_settings()
     stats = await _stats(session)
+    contact = await _contact_account(session)
     return InstanceV2(
         domain=settings.local_domain,
         title=settings.local_domain,
@@ -177,11 +236,11 @@ async def instance_v2(session: DBSession) -> InstanceV2:
         source_url=_source_url(),
         description="",
         usage={"users": {"active_month": stats["user_count"]}},
-        thumbnail={"url": f"https://{settings.effective_web_domain}/preview.png"},
+        thumbnail=_thumbnail(settings),
         icon=[
-            {"src": f"https://{settings.effective_web_domain}/icon-{size}.png",
-             "size": f"{size}x{size}"}
+            {"src": settings.base_url(f"/icon-{size}.png"), "size": f"{size}x{size}"}
             for size in (36, 48, 72, 96, 144, 192, 256, 384, 512)
+            if os.path.isfile(f"public/icon-{size}.png")
         ],
         languages=DEFAULT_LANGUAGES,
         configuration=_configuration(),
@@ -190,7 +249,7 @@ async def instance_v2(session: DBSession) -> InstanceV2:
             "approval_required": False,
             "message": None,
         },
-        contact={"email": settings.smtp_from_address, "account": None},
+        contact={"email": settings.smtp_from_address, "account": contact},
         rules=[],
     )
 
@@ -211,6 +270,73 @@ async def instance_peers(session: DBSession) -> list[str]:
     return sorted(d for d in rows if d)
 
 
+@router.get("/api/v1/instance/extended_description")
+async def instance_extended_description() -> dict[str, Any]:
+    return {"updated_at": None, "content": ""}
+
+
+_PRIVACY_POLICY_UPDATED_AT = "2022-10-07T00:00:00.000Z"
+_PRIVACY_POLICY_TEMPLATE: str | None = None
+
+
+def _load_privacy_policy_template() -> str:
+    global _PRIVACY_POLICY_TEMPLATE  # noqa: PLW0603
+    if _PRIVACY_POLICY_TEMPLATE is None:
+        try:
+            with open("config/templates/privacy-policy.md", encoding="utf-8") as f:
+                _PRIVACY_POLICY_TEMPLATE = f.read()
+        except FileNotFoundError:
+            _PRIVACY_POLICY_TEMPLATE = ""
+    return _PRIVACY_POLICY_TEMPLATE
+
+
+@router.get("/api/v1/instance/privacy_policy")
+async def instance_privacy_policy() -> dict[str, Any]:
+    import markdown as md  # noqa: PLC0415
+
+    settings = get_settings()
+    template = _load_privacy_policy_template()
+    text = template.replace("%{domain}", settings.local_domain)
+    content = md.markdown(text, extensions=["nl2br"])
+    return {"updated_at": _PRIVACY_POLICY_UPDATED_AT, "content": content}
+
+
+@router.get("/api/v1/instance/translation_languages")
+async def instance_translation_languages() -> dict[str, Any]:
+    return {}
+
+
+@router.get("/api/v1/instance/domain_blocks")
+async def instance_domain_blocks() -> list[dict[str, Any]]:
+    return []
+
+
+@router.get("/api/v1/instance/terms_of_service")
+async def instance_terms_of_service() -> dict[str, Any]:
+    return {"updated_at": None, "content": ""}
+
+
+@router.get("/api/v1/annual_reports/{year}/state")
+async def annual_report_state(year: int) -> dict[str, Any]:
+    return {"year": year, "status": "unavailable"}
+
+
+@router.post("/api/v1/annual_reports/{year}/generate", status_code=200)
+async def annual_report_generate(year: int) -> dict[str, Any]:
+    return {"year": year, "status": "unavailable"}
+
+
+@router.get("/api/v1/annual_reports/{year}")
+async def annual_report(year: int) -> dict[str, Any]:
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Not found")
+
+
+@router.get("/api/v1_alpha/async_refreshes/{refresh_id}")
+async def async_refresh_status(refresh_id: str) -> dict[str, Any]:
+    return {"id": refresh_id, "status": "complete"}
+
+
 @router.get("/api/v1/instance/rules", response_model=list[dict[str, Any]])
 async def instance_rules() -> list[dict[str, Any]]:
     """Server rules. The `rules` table isn't yet ported; returning `[]`
@@ -219,28 +345,160 @@ async def instance_rules() -> list[dict[str, Any]]:
     return []
 
 
-# ---------- /api/v1/trends/* stubs ----------
-
-
-@router.get("/api/v1/trends/tags", response_model=list[dict[str, Any]])
-async def trends_tags() -> list[dict[str, Any]]:
-    """Stub. The trending pipeline (Phase 5) computes weighted scores
-    against the tag_trends table; until that ports we return []."""
-    return []
+# ---------- /api/v1/trends/* ----------
 
 
 @router.get("/api/v1/trends/statuses", response_model=list[dict[str, Any]])
-async def trends_statuses() -> list[dict[str, Any]]:
-    return []
+async def trends_statuses(session: DBSession) -> list[dict[str, Any]]:
+    """Return the 20 most-engaged public local statuses from the last 7 days."""
+    from app.python.schemas.status import serialize_status  # noqa: PLC0415
+
+    cutoff = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+    stmt = (
+        select(Status)
+        .outerjoin(StatusStat, StatusStat.status_id == Status.id)
+        .where(
+            Status.visibility == Visibility.PUBLIC.value,
+            Status.deleted_at.is_(None),
+            Status.reblog_of_id.is_(None),
+            Status.local.is_(True),
+            Status.created_at > cutoff,
+        )
+        .order_by(
+            (
+                func.coalesce(StatusStat.reblogs_count, 0)
+                + func.coalesce(StatusStat.favourites_count, 0)
+            ).desc(),
+            Status.id.desc(),
+        )
+        .limit(20)
+    )
+    rows = (await session.execute(stmt)).unique().scalars().all()
+    return [serialize_status(s).model_dump() for s in rows]
+
+
+@router.get("/api/v1/trends/tags", response_model=list[dict[str, Any]])
+async def trends_tags(session: DBSession) -> list[dict[str, Any]]:
+    """Return the 10 most-used hashtags in the last 7 days with per-day history."""
+    from sqlalchemy import Integer, cast, distinct  # noqa: PLC0415
+    host = _asset_host()
+    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    cutoff = now - timedelta(days=7)
+
+    # Find the top tags by total usage in the last 7 days.
+    top_stmt = (
+        select(Tag.id, Tag.name, func.count(StatusTag.status_id).label("usage_count"))
+        .join(StatusTag, StatusTag.tag_id == Tag.id)
+        .join(Status, Status.id == StatusTag.status_id)
+        .where(
+            Status.visibility == Visibility.PUBLIC.value,
+            Status.deleted_at.is_(None),
+            Status.local.is_(True),
+            Status.created_at > cutoff,
+        )
+        .group_by(Tag.id)
+        .order_by(func.count(StatusTag.status_id).desc())
+        .limit(10)
+    )
+    top_rows = (await session.execute(top_stmt)).all()
+    if not top_rows:
+        return []
+
+    tag_ids = [row.id for row in top_rows]
+
+    # Compute per-day uses + accounts for each tag over the last 7 days.
+    # day_offset = floor((now - created_at) / 86400) → 0 = today, 6 = 6 days ago.
+    epoch = datetime(1970, 1, 1)
+    day_stmt = (
+        select(
+            StatusTag.tag_id,
+            cast(
+                func.floor(
+                    func.extract("epoch", now - Status.created_at) / 86400
+                ),
+                Integer,
+            ).label("day_offset"),
+            func.count(StatusTag.status_id).label("uses"),
+            func.count(distinct(Status.account_id)).label("accounts"),
+        )
+        .join(Status, Status.id == StatusTag.status_id)
+        .where(
+            StatusTag.tag_id.in_(tag_ids),
+            Status.visibility == Visibility.PUBLIC.value,
+            Status.deleted_at.is_(None),
+            Status.local.is_(True),
+            Status.created_at > cutoff,
+        )
+        .group_by(StatusTag.tag_id, "day_offset")
+    )
+    day_rows = (await session.execute(day_stmt)).all()
+
+    # Build lookup: tag_id → {day_offset: {uses, accounts}}
+    day_data: dict[int, dict[int, dict]] = {}
+    for row in day_rows:
+        day_data.setdefault(row.tag_id, {})[int(row.day_offset)] = {
+            "uses": int(row.uses),
+            "accounts": int(row.accounts),
+        }
+
+    result = []
+    for row in top_rows:
+        # Mastodon returns history newest-first: index 0 = today, index 1 = yesterday…
+        history = []
+        for offset in range(7):
+            day_dt = now - timedelta(days=offset)
+            day_ts = int((day_dt.replace(hour=0, minute=0, second=0, microsecond=0) - epoch).total_seconds())
+            counts = day_data.get(row.id, {}).get(offset, {"uses": 0, "accounts": 0})
+            history.append({
+                "day": str(day_ts),
+                "uses": str(counts["uses"]),
+                "accounts": str(counts["accounts"]),
+            })
+        result.append({
+            "name": row.name,
+            "url": f"{host}/tags/{row.name}",
+            "history": history,
+            "following": False,
+        })
+    return result
 
 
 @router.get("/api/v1/trends/links", response_model=list[dict[str, Any]])
 async def trends_links() -> list[dict[str, Any]]:
+    """No preview cards table yet — always empty."""
     return []
 
 
 # Mastodon API v1.4+ collapsed `/api/v1/trends` (without /tags) to mean
 # `/api/v1/trends/tags`. Match the alias.
 @router.get("/api/v1/trends", response_model=list[dict[str, Any]])
-async def trends_legacy_alias() -> list[dict[str, Any]]:
+async def trends_legacy_alias(session: DBSession) -> list[dict[str, Any]]:
+    return await trends_tags(session)
+
+
+# ---------- /api/v1/annual_reports ----------
+
+from app.python.deps import CurrentAccount  # noqa: E402
+
+
+@router.get("/api/v1/annual_reports", response_model=list[dict[str, Any]])
+async def annual_reports(account: CurrentAccount) -> list[dict[str, Any]]:
+    """Annual report summary (Wrapstodon). Returns empty until table is ported."""
     return []
+
+
+@router.post("/api/v1/annual_reports/{year}/read", status_code=200)
+async def read_annual_report(year: int, account: CurrentAccount) -> dict[str, Any]:
+    return {}
+
+
+@router.get("/api/v1/annual_reports/{year}/state")
+async def annual_report_state(year: int, account: CurrentAccount) -> dict[str, Any]:
+    return {"year": year, "state": "not_generated"}
+
+
+@router.post("/api/v1/annual_reports/{year}/generate", status_code=200)
+async def generate_annual_report(year: int, account: CurrentAccount) -> dict[str, Any]:
+    return {}
+
+

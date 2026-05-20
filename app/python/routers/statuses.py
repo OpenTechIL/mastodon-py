@@ -1,12 +1,14 @@
-"""`/api/v1/statuses/*` endpoints — read-only slice."""
+"""`/api/v1/statuses/*` endpoints."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 
 from app.python.deps import CurrentAccount, DBSession, OptionalAuth
-from app.python.models import Account, Status, StatusEdit
+from app.python.models import Account, Favourite, Status, StatusEdit
 from app.python.queue import Enqueuer, get_enqueuer
 from app.python.policies.status_policy import visible_to
 from app.python.schemas.status import Status_, serialize_status
@@ -486,3 +488,110 @@ async def unreblog(
     await session.refresh(parent, ["stat"])
     relationships = await load_relationships(session, account.id, [parent.id])
     return serialize_status(parent, relationships=relationships)
+
+
+@router.get("/{status_id}/favourited_by", response_model=list[Any])
+async def favourited_by(
+    status_id: int,
+    session: DBSession,
+    viewer: OptionalAuth,
+    max_id: int | None = Query(default=None),
+    since_id: int | None = Query(default=None),
+    limit: int = Query(default=40, ge=1, le=80),
+) -> list[Any]:
+    """Accounts that favourited the status."""
+    from app.python.schemas.account import serialize_account  # noqa: PLC0415
+
+    viewer_id = viewer.account.id if (viewer and viewer.account) else None
+    st = await _load_visible_status(session, status_id, viewer_id)
+    stmt = (
+        select(Account, Favourite.id.label("fav_id"))
+        .join(Favourite, Favourite.account_id == Account.id)
+        .where(Favourite.status_id == st.id)
+    )
+    if max_id is not None:
+        stmt = stmt.where(Favourite.id < max_id)
+    if since_id is not None:
+        stmt = stmt.where(Favourite.id > since_id)
+    stmt = stmt.order_by(Favourite.id.desc()).limit(limit)
+    rows = (await session.execute(stmt)).all()
+    return [serialize_account(acc) for acc, _ in rows]
+
+
+@router.get("/{status_id}/reblogged_by", response_model=list[Any])
+async def reblogged_by(
+    status_id: int,
+    session: DBSession,
+    viewer: OptionalAuth,
+    max_id: int | None = Query(default=None),
+    since_id: int | None = Query(default=None),
+    limit: int = Query(default=40, ge=1, le=80),
+) -> list[Any]:
+    """Accounts that reblogged the status."""
+    from app.python.schemas.account import serialize_account  # noqa: PLC0415
+
+    viewer_id = viewer.account.id if (viewer and viewer.account) else None
+    st = await _load_visible_status(session, status_id, viewer_id)
+    stmt = (
+        select(Account)
+        .join(Status, Status.account_id == Account.id)
+        .where(Status.reblog_of_id == st.id)
+    )
+    if max_id is not None:
+        stmt = stmt.where(Status.id < max_id)
+    if since_id is not None:
+        stmt = stmt.where(Status.id > since_id)
+    stmt = stmt.order_by(Status.id.desc()).limit(limit)
+    rows = (await session.execute(stmt)).unique().scalars().all()
+    return [serialize_account(acc) for acc in rows]
+
+
+@router.post("/{status_id}/mute", response_model=Status_)
+async def mute_status(
+    status_id: int,
+    session: DBSession,
+    account: CurrentAccount,
+) -> Status_:
+    """Mute notifications for a conversation thread. No-op until status_mutes table is ported."""
+    st = await _load_visible_status(session, status_id, account.id)
+    relationships = await load_relationships(session, account.id, [st.id])
+    return serialize_status(st, relationships=relationships)
+
+
+@router.post("/{status_id}/unmute", response_model=Status_)
+async def unmute_status(
+    status_id: int,
+    session: DBSession,
+    account: CurrentAccount,
+) -> Status_:
+    """Unmute notifications for a conversation thread."""
+    st = await _load_visible_status(session, status_id, account.id)
+    relationships = await load_relationships(session, account.id, [st.id])
+    return serialize_status(st, relationships=relationships)
+
+
+@router.get("/{status_id}/translate", response_model=dict[str, Any])
+async def translate_status(
+    status_id: int,
+    session: DBSession,
+    account: CurrentAccount,
+) -> dict[str, Any]:
+    """Translation stub — returns empty until translation service is ported."""
+    await _load_visible_status(session, status_id, account.id)
+    return {"content": "", "spoiler_text": "", "poll": None, "media_attachments": [], "detected_source_language": None, "provider": None}
+
+
+@router.get("/{status_id}/quotes", response_model=list[Any])
+async def status_quotes(
+    status_id: int,
+    session: DBSession,
+    viewer: OptionalAuth,
+    max_id: int | None = Query(default=None),
+    since_id: int | None = Query(default=None),
+    limit: int = Query(default=40, ge=1, le=80),
+) -> list[Any]:
+    """Statuses that quote this status."""
+    viewer_id = viewer.account.id if (viewer and viewer.account) else None
+    await _load_visible_status(session, status_id, viewer_id)
+    return []
+

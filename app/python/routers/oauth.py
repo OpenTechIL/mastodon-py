@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import timezone
 from typing import Any
 
-from fastapi import APIRouter, Form, HTTPException, status
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.python.auth import oauth as oauth_service
 from app.python.deps import DBSession
@@ -46,10 +46,24 @@ class CredentialApp(BaseModel):
     vapid_key: str | None
 
 
+async def _parse_app_create(request: Request) -> AppCreate:
+    """Accept JSON or form-encoded body (both are valid per Mastodon spec)."""
+    content_type = request.headers.get("content-type", "")
+    try:
+        if "application/json" in content_type:
+            data = await request.json()
+        else:
+            form = await request.form()
+            data = dict(form)
+        return AppCreate.model_validate(data)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+
 @router.post("/api/v1/apps", response_model=CredentialApp, status_code=status.HTTP_200_OK)
 async def register(
-    body: AppCreate,
     session: DBSession,
+    body: AppCreate = Depends(_parse_app_create),
 ) -> CredentialApp:
     """Anonymous endpoint — anyone can register an OAuth client.
 

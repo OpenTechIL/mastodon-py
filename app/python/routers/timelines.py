@@ -20,8 +20,12 @@ from app.python.models import (
     AccountDomainBlock,
     Block,
     Follow,
+    List as List_,
+    ListAccount,
     Mute,
     Status,
+    StatusTag,
+    Tag,
     Visibility,
 )
 from app.python.schemas.status import Status_, serialize_status
@@ -156,3 +160,85 @@ async def home_timeline(
         serialize_status(row, relationships=relationships, filter_checks=filter_checks)
         for row in ordered
     ]
+
+
+@router.get("/tag/{hashtag}", response_model=list[Status_])
+async def tag_timeline(
+    hashtag: str,
+    request: Request,
+    response: Response,
+    session: DBSession,
+    auth: OptionalAuth,
+    params: Annotated[PageParams, Depends(page_params)],
+    local: bool = Query(False),
+    remote: bool = Query(False),
+    only_media: bool = Query(False),
+) -> list[Status_]:
+    tag_q = select(Tag).where(Tag.name == hashtag.lower())
+    tag = (await session.execute(tag_q)).scalars().first()
+    if not tag:
+        return []
+    stmt = (
+        select(Status)
+        .join(StatusTag, StatusTag.status_id == Status.id)
+        .where(
+            StatusTag.tag_id == tag.id,
+            Status.deleted_at.is_(None),
+            Status.visibility.in_([Visibility.PUBLIC.value, Visibility.UNLISTED.value]),
+        )
+    )
+    if local:
+        stmt = stmt.where(Status.local.is_(True))
+    if remote:
+        stmt = stmt.where(Status.local.is_(False))
+    stmt = apply_pagination(stmt, Status.id, params)
+    rows = (await session.execute(stmt)).unique().scalars().all()
+    ordered = maybe_reverse(rows, params)
+    if ordered:
+        response.headers["Link"] = build_link_header(
+            str(request.url.include_query_params().replace(query="")), ordered, params,
+        )
+    viewer_id = auth.account.id if auth and auth.account else None
+    relationships = await load_relationships(session, viewer_id, status_ids_for_batch(ordered))
+    return [serialize_status(row, relationships=relationships) for row in ordered]
+
+
+@router.get("/list/{list_id}", response_model=list[Status_])
+async def list_timeline(
+    list_id: int,
+    request: Request,
+    response: Response,
+    session: DBSession,
+    account: CurrentAccount,
+    params: Annotated[PageParams, Depends(page_params)],
+) -> list[Status_]:
+    from fastapi import HTTPException
+    list_q = select(List_).where(List_.id == list_id, List_.account_id == account.id)
+    lst = (await session.execute(list_q)).scalars().first()
+    if not lst:
+        raise HTTPException(status_code=404, detail="Record not found")
+    member_ids = select(ListAccount.account_id).where(ListAccount.list_id == list_id)
+    stmt = (
+        select(Status)
+        .where(
+            Status.account_id.in_(member_ids),
+            Status.deleted_at.is_(None),
+        )
+    )
+    stmt = apply_pagination(stmt, Status.id, params)
+    rows = (await session.execute(stmt)).unique().scalars().all()
+    ordered = maybe_reverse(rows, params)
+    if ordered:
+        response.headers["Link"] = build_link_header(
+            str(request.url.include_query_params().replace(query="")), ordered, params,
+        )
+    relationships = await load_relationships(session, account.id, status_ids_for_batch(ordered))
+    return [serialize_status(row, relationships=relationships) for row in ordered]
+
+
+@router.get("/link", response_model=list[Status_])
+async def link_timeline(
+    url: str = Query(...),
+) -> list[Status_]:
+    """Statuses that link to a given URL (trending link timeline)."""
+    return []

@@ -249,3 +249,39 @@ async def mutes_listing(
         target_id_col=Mute.target_account_id,
         where=Mute.account_id == viewer.id,
     )
+
+
+# ---------- /api/v1/scheduled_statuses ----------
+# Scheduled posting is not yet implemented; return empty list so the
+# Mastodon SPA doesn't break when polling this endpoint on load.
+
+@router.get("/api/v1/scheduled_statuses", response_model=list)
+async def scheduled_statuses_index(viewer: CurrentAccount) -> list:
+    return []
+
+
+@router.get("/api/v1/scheduled_statuses/{scheduled_status_id}", response_model=dict)
+async def scheduled_status_show(
+    scheduled_status_id: int,
+    viewer: CurrentAccount,
+) -> dict:
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Record not found")
+
+
+@router.put("/api/v1/scheduled_statuses/{scheduled_status_id}", response_model=dict)
+async def scheduled_status_update(
+    scheduled_status_id: int,
+    viewer: CurrentAccount,
+) -> dict:
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Record not found")
+
+
+@router.delete("/api/v1/scheduled_statuses/{scheduled_status_id}", status_code=200)
+async def scheduled_status_destroy(
+    scheduled_status_id: int,
+    viewer: CurrentAccount,
+) -> dict:
+    from fastapi import HTTPException
+    raise HTTPException(status_code=404, detail="Record not found")

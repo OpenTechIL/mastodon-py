@@ -26,10 +26,16 @@ async def _acquire_lock(session: AsyncSession, table: str, row_id: int) -> None:
     # UPDATE is atomic on its own and tests run serially anyway.
     if session.bind is None or session.bind.dialect.name != "postgresql":
         return
-    table_key = abs(hash(table)) & 0xFFFFFFFF
+    table_key = abs(hash(table)) & 0xFFFF
+    # pg_advisory_xact_lock(int8) accepts a 64-bit key; combine the
+    # 16-bit table namespace and 48 low bits of row_id into one int64.
+    lock_key = (table_key << 48) | (row_id & 0xFFFFFFFFFFFF)
+    # Cast to signed int64 range.
+    if lock_key >= (1 << 63):
+        lock_key -= 1 << 64
     await session.execute(
-        text("SELECT pg_advisory_xact_lock(:ns, :key)"),
-        {"ns": _ADVISORY_LOCK_NAMESPACE ^ table_key, "key": row_id},
+        text("SELECT pg_advisory_xact_lock(:key)"),
+        {"key": lock_key},
     )
 
 

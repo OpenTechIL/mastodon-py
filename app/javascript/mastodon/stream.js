@@ -96,6 +96,8 @@ const sharedCallbacks = {
   received(data) {
     const { stream } = data;
 
+    if (!stream) return;
+
     subscriptions.filter(({ channelName, params }) => {
       const streamChannelName = stream[0];
 

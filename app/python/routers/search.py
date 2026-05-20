@@ -49,6 +49,7 @@ class SearchResults(BaseModel):
 SearchType = Literal["accounts", "statuses", "hashtags"]
 
 
+@router.get("/api/v1/search", response_model=SearchResults)
 @router.get("/api/v2/search", response_model=SearchResults)
 async def search(
     session: DBSession,

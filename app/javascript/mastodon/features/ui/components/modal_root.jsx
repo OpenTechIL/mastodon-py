@@ -162,7 +162,13 @@ export default class ModalRoot extends PureComponent {
           <>
             <Bundle key={type} fetchComponent={MODAL_COMPONENTS[type]} loading={this.renderLoading} error={this.renderError} renderDelay={200}>
               {(SpecificComponent) => {
-                return <SpecificComponent {...props} onChangeBackgroundColor={this.setBackgroundColor} onClose={this.handleClose} ref={this.setModalRef} />;
+                // Only attach the ref to class components and forwardRef components.
+                // Plain function components will warn and silently drop it otherwise.
+                const supportsRef = !!(
+                  SpecificComponent.prototype?.isReactComponent ||
+                  SpecificComponent.$$typeof === Symbol.for('react.forward_ref')
+                );
+                return <SpecificComponent {...props} onChangeBackgroundColor={this.setBackgroundColor} onClose={this.handleClose} {...(supportsRef ? { ref: this.setModalRef } : {})} />;
               }}
             </Bundle>
 

@@ -30,10 +30,10 @@ from sqlalchemy import func, select
 
 from app.python.deps import DBSession, HttpClient
 from app.python.federation.activity import dispatch as dispatch_activity
-from app.python.federation.serializers import serialize_create_activity
+from app.python.federation.serializers import serialize_create_activity, serialize_note
 from app.python.federation.signed_request import verify_signed_request
-from app.python.lib.asset_urls import _asset_host, account_uri  # noqa: PLC2701
-from app.python.models import Account, Follow, Status, Visibility
+from app.python.lib.asset_urls import _asset_host, account_uri, avatar_url, header_url  # noqa: PLC2701
+from app.python.models import Account, Follow, Status, StatusPin, Visibility
 from app.python.queue import Enqueuer, get_enqueuer
 
 router = APIRouter(tags=["activitypub"])
@@ -47,44 +47,106 @@ _SECURITY_CONTEXT = "https://w3id.org/security/v1"
 
 
 def _actor_json(account: Account) -> dict:
-    """Build the AP Person object for a local actor.
-
-    Skips presence-of-data niceties (icon/image, summary HTML, fields)
-    until the corresponding serializer ports — this is the minimum
-    shape a remote peer needs to verify our signatures and deliver
-    to our inbox.
-    """
+    """Build the AP Person object for a local actor."""
     host = _asset_host()
     actor_url = f"{host}/users/{account.username}"
-    return {
-        "@context": [_AS2_CONTEXT, _SECURITY_CONTEXT],
+    body: dict = {
+        "@context": [
+            _AS2_CONTEXT,
+            _SECURITY_CONTEXT,
+            {
+                "toot": "http://joinmastodon.org/ns#",
+                "Hashtag": "as:Hashtag",
+                "sensitive": "as:sensitive",
+                "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+                "movedTo": {"@id": "as:movedTo", "@type": "@id"},
+                "alsoKnownAs": {"@id": "as:alsoKnownAs", "@type": "@id"},
+                "indexable": "toot:indexable",
+                "discoverable": "toot:discoverable",
+                "suspended": "toot:suspended",
+                "memorial": "toot:memorial",
+                "schema": "http://schema.org#",
+                "PropertyValue": "schema:PropertyValue",
+                "value": "schema:value",
+            },
+        ],
         "id": actor_url,
         "type": account.actor_type or "Person",
         "preferredUsername": account.username,
         "name": account.display_name or account.username,
+        "summary": account.note or "",
         "url": f"{host}/@{account.username}",
         "inbox": f"{actor_url}/inbox",
         "outbox": f"{actor_url}/outbox",
         "followers": f"{actor_url}/followers",
         "following": f"{actor_url}/following",
+        "featured": f"{actor_url}/featured",
+        "endpoints": {
+            "sharedInbox": f"{host}/inbox",
+        },
         "publicKey": {
             "id": f"{actor_url}#main-key",
             "owner": actor_url,
-            "publicKeyPem": account.public_key,
+            "publicKeyPem": account.public_key or "",
         },
         "manuallyApprovesFollowers": account.locked,
         "discoverable": bool(account.discoverable),
         "indexable": account.indexable,
     }
 
+    # Actor icon (avatar)
+    av = avatar_url(account)
+    body["icon"] = {
+        "type": "Image",
+        "mediaType": account.avatar_content_type or "image/png",
+        "url": av,
+    }
+
+    # Actor image (header banner)
+    hd = header_url(account)
+    body["image"] = {
+        "type": "Image",
+        "mediaType": account.header_content_type or "image/png",
+        "url": hd,
+    }
+
+    # Profile fields as schema:PropertyValue attachment array
+    fields = account.fields or []
+    if fields:
+        body["attachment"] = [
+            {
+                "type": "PropertyValue",
+                "name": f.get("name", ""),
+                "value": f.get("value", ""),
+            }
+            for f in fields
+        ]
+
+    # published date
+    if account.created_at:
+        body["published"] = account.created_at.isoformat(timespec="seconds") + "Z"
+
+    return body
+
+
+def _wants_html(accept: str | None) -> bool:
+    """Return True when the client prefers text/html over activity+json."""
+    if not accept:
+        return False
+    # Browsers send Accept: text/html,... with high q-value.
+    # AP clients send application/activity+json or application/ld+json.
+    accept_lower = accept.lower()
+    has_html = "text/html" in accept_lower
+    has_ap = "activity+json" in accept_lower or "ld+json" in accept_lower
+    return has_html and not has_ap
+
 
 @router.get("/users/{username}")
-async def actor(username: str, session: DBSession) -> Response:
+async def actor(username: str, request: Request, session: DBSession) -> Response:
     """Serve the AP Person object for a local actor.
 
-    Content negotiation isn't done here — Mastodon's web routes
-    handle the HTML profile page separately. This route always
-    returns activity+json; the HTML route can co-exist on `/@user`.
+    Content negotiation: browsers (Accept: text/html) are redirected to
+    the profile HTML page. AP clients receive application/activity+json.
     """
     row = (
         await session.execute(
@@ -96,6 +158,13 @@ async def actor(username: str, session: DBSession) -> Response:
     if row is None:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND, detail="Record not found"
+        )
+    accept = request.headers.get("accept", "")
+    if _wants_html(accept):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"{_asset_host()}/@{row.username}",
+            status_code=302,
         )
     return Response(
         content=json.dumps(_actor_json(row)),
@@ -383,6 +452,31 @@ async def outbox_collection(
             body["next"] = f"{endpoint}?page={page_num + 1}"
         if page_num > 1:
             body["prev"] = f"{endpoint}?page={page_num - 1}"
+    return Response(content=json.dumps(body), media_type=_AP_MEDIA_TYPE)
+
+
+@router.get("/users/{username}/featured")
+async def featured_collection(username: str, session: DBSession) -> Response:
+    """Pinned statuses as an OrderedCollection of Notes."""
+    account = await _load_local_actor(session, username)
+    endpoint = f"{_asset_host()}/users/{account.username}/featured"
+
+    stmt = (
+        select(Status)
+        .join(StatusPin, StatusPin.status_id == Status.id)
+        .where(StatusPin.account_id == account.id)
+        .order_by(StatusPin.id.desc())
+    )
+    rows = (await session.execute(stmt)).unique().scalars().all()
+    items = [serialize_note(s, account) for s in rows]
+
+    body = {
+        "@context": _AS2_CONTEXT,
+        "id": endpoint,
+        "type": "OrderedCollection",
+        "totalItems": len(items),
+        "orderedItems": items,
+    }
     return Response(content=json.dumps(body), media_type=_AP_MEDIA_TYPE)
 
 

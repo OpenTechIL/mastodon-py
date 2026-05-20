@@ -70,5 +70,6 @@ def get_storage(settings: Settings | None = None) -> Storage:
             access_key_id=s.s3_access_key_id,
             secret_access_key=s.s3_secret_access_key,
         )
-    base_url = f"https://{s.effective_web_domain}/system"
+    scheme = "https" if s.env == "production" else "http"
+    base_url = f"{scheme}://{s.effective_web_domain}/system"
     return LocalStorage(root=Path(s.media_root), base_url=base_url)

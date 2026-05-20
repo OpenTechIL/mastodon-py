@@ -23,12 +23,15 @@ Mastodon's WebFinger contract:
 
 from __future__ import annotations
 
+import json
+import os
+
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.python.deps import DBSession
 from app.python.lib.asset_urls import _asset_host  # noqa: PLC2701
-from app.python.models import Account
+from app.python.models import Account, Status, User
 from app.python.settings import get_settings
 
 router = APIRouter(tags=["well-known"])
@@ -97,11 +100,144 @@ async def webfinger(
             },
         ],
     }
-    import json
-
     # Mastodon and the wider Fediverse expect `application/jrd+json`
     # specifically — some peers reject `application/json` here.
     return Response(
         content=json.dumps(body),
         media_type="application/jrd+json",
+    )
+
+
+# ── NodeInfo ──────────────────────────────────────────────────────────────────
+
+@router.get("/.well-known/nodeinfo")
+async def nodeinfo_discovery() -> Response:
+    """NodeInfo discovery document — points to the 2.0 schema endpoint."""
+    settings = get_settings()
+    host = _asset_host()
+    body = {
+        "links": [
+            {
+                "rel": "http://nodeinfo.diaspora.software/ns/schema/2.0",
+                "href": f"{host}/nodeinfo/2.0",
+            }
+        ]
+    }
+    return Response(
+        content=json.dumps(body),
+        media_type="application/json; profile=\"http://nodeinfo.diaspora.software/ns/schema/2.0#\"",
+    )
+
+
+@router.get("/nodeinfo/2.0")
+async def nodeinfo_schema(session: DBSession) -> Response:
+    """NodeInfo 2.0 — server software, usage stats, and capabilities."""
+    settings = get_settings()
+    user_count = (
+        await session.execute(select(func.count()).select_from(User))
+    ).scalar_one()
+    status_count = (
+        await session.execute(
+            select(func.count()).select_from(Status)
+            .where(Status.deleted_at.is_(None), Status.local.is_(True))
+        )
+    ).scalar_one()
+    body = {
+        "version": "2.0",
+        "software": {"name": "mastodon", "version": "4.3.0+python"},
+        "protocols": ["activitypub"],
+        "services": {"outbound": [], "inbound": []},
+        "usage": {
+            "users": {
+                "total": int(user_count or 0),
+                "activeMonth": int(user_count or 0),
+                "activeHalfyear": int(user_count or 0),
+            },
+            "localPosts": int(status_count or 0),
+        },
+        "openRegistrations": True,
+        "metadata": {
+            "nodeName": settings.local_domain,
+            "nodeDescription": "",
+        },
+    }
+    return Response(
+        content=json.dumps(body),
+        media_type="application/json; profile=\"http://nodeinfo.diaspora.software/ns/schema/2.0#\"",
+    )
+
+
+# ── Web App Manifest ──────────────────────────────────────────────────────────
+
+_ANDROID_ICON_SIZES = [36, 48, 72, 96, 144, 192, 256, 384, 512]
+
+
+@router.get("/manifest.json")
+async def web_manifest() -> Response:
+    """PWA manifest — enables Add to Home Screen on mobile browsers."""
+    settings = get_settings()
+    host = _asset_host()
+    domain = settings.local_domain
+
+    icons = []
+    for size in _ANDROID_ICON_SIZES:
+        src = f"{host}/icon-{size}.png" if os.path.isfile(f"public/icon-{size}.png") else \
+              f"{host}/packs-dev/icons/android-chrome-{size}x{size}.png"
+        icons.append({
+            "src": src,
+            "sizes": f"{size}x{size}",
+            "type": "image/png",
+            "purpose": "any maskable",
+        })
+
+    body = {
+        "id": "/home",
+        "name": domain,
+        "short_name": domain,
+        "icons": icons,
+        "theme_color": "#191b22",
+        "background_color": "#191b22",
+        "display": "standalone",
+        "start_url": "/",
+        "scope": "/",
+        "share_target": {
+            "action": "/share",
+            "method": "GET",
+            "params": {"title": "title", "text": "text", "url": "url"},
+        },
+        "shortcuts": [
+            {"name": "Compose", "url": "/web/statuses/new", "icons": []},
+            {"name": "Explore", "url": "/web/explore", "icons": []},
+            {"name": "Notifications", "url": "/web/notifications", "icons": []},
+        ],
+        "prefer_related_applications": False,
+        "related_applications": [],
+    }
+    return Response(
+        content=json.dumps(body),
+        media_type="application/manifest+json",
+    )
+
+
+# ── oauth-authorization-server ────────────────────────────────────────────────
+
+@router.get("/.well-known/oauth-authorization-server")
+async def oauth_authorization_server() -> Response:
+    """OAuth 2.0 Authorization Server Metadata (RFC 8414)."""
+    settings = get_settings()
+    host = _asset_host()
+    body = {
+        "issuer": host,
+        "authorization_endpoint": f"{host}/oauth/authorize",
+        "token_endpoint": f"{host}/oauth/token",
+        "revocation_endpoint": f"{host}/oauth/revoke",
+        "scopes_supported": ["read", "write", "follow", "push", "admin:read", "admin:write"],
+        "response_types_supported": ["code"],
+        "response_modes_supported": ["query", "fragment"],
+        "grant_types_supported": ["authorization_code", "client_credentials"],
+        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+    }
+    return Response(
+        content=json.dumps(body),
+        media_type="application/json",
     )

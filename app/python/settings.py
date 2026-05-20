@@ -98,6 +98,13 @@ class Settings(BaseSettings):
     def effective_web_domain(self) -> str:
         return self.web_domain or self.local_domain
 
+    @property
+    def url_scheme(self) -> str:
+        return "https" if self.env == "production" else "http"
+
+    def base_url(self, path: str = "") -> str:
+        return f"{self.url_scheme}://{self.effective_web_domain}{path}"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

@@ -11,34 +11,27 @@ ARG TARGETPLATFORM=${TARGETPLATFORM}
 ARG BUILDPLATFORM=${BUILDPLATFORM}
 ARG BASE_REGISTRY="docker.io"
 
-# Ruby image to use for base image, change with [--build-arg RUBY_VERSION="4.0.x"]
-# renovate: datasource=docker depName=docker.io/ruby
-ARG RUBY_VERSION="4.0.3"
-# # Node.js version to use in base image, change with [--build-arg NODE_MAJOR_VERSION="22"]
+# Python version to use, change with [--build-arg PYTHON_VERSION="3.13"]
+ARG PYTHON_VERSION="3.12"
+# Node.js version to use in base image, change with [--build-arg NODE_MAJOR_VERSION="22"]
 # renovate: datasource=node-version depName=node
 ARG NODE_MAJOR_VERSION="24"
-# Debian image to use for base image, change with [--build-arg DEBIAN_VERSION="trixie"]
+# Debian image to use for base image, change with [--build-arg DEBIAN_VERSION="bookworm"]
 ARG DEBIAN_VERSION="trixie"
-# Node.js image to use for base image based on combined variables (ex: 20-trixie-slim)
+# Node.js image to use for base image based on combined variables (ex: 24-trixie-slim)
 FROM ${BASE_REGISTRY}/node:${NODE_MAJOR_VERSION}-${DEBIAN_VERSION}-slim AS node
-# Ruby image to use for base image based on combined variables (ex: 3.4.x-slim-trixie)
-FROM ${BASE_REGISTRY}/ruby:${RUBY_VERSION}-slim-${DEBIAN_VERSION} AS ruby
+# Python image to use for base image based on combined variables (ex: 3.12-slim-trixie)
+FROM ${BASE_REGISTRY}/python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS python
 
 # Resulting version string is vX.X.X-MASTODON_VERSION_PRERELEASE+MASTODON_VERSION_METADATA
 # Example: v4.3.0-nightly.2023-11-09+pr-123456
 # Overwrite existence of 'alpha.X' in version.rb [--build-arg MASTODON_VERSION_PRERELEASE="nightly.2023-11-09"]
 ARG MASTODON_VERSION_PRERELEASE=""
-# Append build metadata or fork information to version.rb [--build-arg MASTODON_VERSION_METADATA="pr-123456"]
+# Append build metadata or fork information [--build-arg MASTODON_VERSION_METADATA="pr-123456"]
 ARG MASTODON_VERSION_METADATA=""
-# Will be available as Mastodon::Version.source_commit
+# Will be available as source commit reference
 ARG SOURCE_COMMIT=""
 
-# Allow Ruby on Rails to serve static files
-# See: https://docs.joinmastodon.org/admin/config/#rails_serve_static_files
-ARG RAILS_SERVE_STATIC_FILES="true"
-# Allow to use YJIT compiler
-# See: https://github.com/ruby/ruby/blob/v3_2_4/doc/yjit/yjit.md
-ARG RUBY_YJIT_ENABLE="1"
 # Timezone used by the Docker container and runtime, change with [--build-arg TZ=Europe/Berlin]
 ARG TZ="Etc/UTC"
 # Linux UID (user id) for the mastodon user, change with [--build-arg UID=1234]
@@ -51,25 +44,17 @@ ENV \
   MASTODON_VERSION_PRERELEASE="${MASTODON_VERSION_PRERELEASE}" \
   MASTODON_VERSION_METADATA="${MASTODON_VERSION_METADATA}" \
   SOURCE_COMMIT="${SOURCE_COMMIT}" \
-  RAILS_SERVE_STATIC_FILES="${RAILS_SERVE_STATIC_FILES}" \
-  RUBY_YJIT_ENABLE="${RUBY_YJIT_ENABLE}" \
   TZ="${TZ}"
 
 # Configure runtime environment
 # BIND: IP to bind Mastodon to when serving traffic
-# NODE_ENV/RAILS_ENV: production settings for Node.js and Ruby on Rails
+# NODE_ENV/MASTODON_ENV: production settings for Node.js and the FastAPI backend
 # DEBIAN_FRONTEND: suppress interactive prompts
-# PATH: add Ruby and Mastodon installation directories
-# MALLOC_CONF: optimize jemalloc 5.x performance
-# MASTODON_SIDEKIQ_READY_FILENAME: Sidekiq readiness check filename for Kubernetes
 ENV \
   BIND="0.0.0.0" \
   NODE_ENV="production" \
-  RAILS_ENV="production" \
-  DEBIAN_FRONTEND="noninteractive" \
-  PATH="${PATH}:/opt/ruby/bin:/opt/mastodon/bin" \
-  MALLOC_CONF="narenas:2,background_thread:true,thp:never,dirty_decay_ms:1000,muzzy_decay_ms:0" \
-  MASTODON_SIDEKIQ_READY_FILENAME=sidekiq_process_has_started_and_will_begin_processing_jobs
+  MASTODON_ENV="production" \
+  DEBIAN_FRONTEND="noninteractive"
 
 # Set default shell used for running commands
 SHELL ["/bin/bash", "-o", "pipefail", "-o", "errexit", "-c"]
@@ -100,26 +85,18 @@ RUN \
   # Update package list and upgrade system packages
   apt-get update; \
   apt-get dist-upgrade -yq; \
-  # Install jemalloc and other necessary components
+  # Install necessary runtime components
   apt-get install -y --no-install-recommends \
   curl \
   file \
-  libjemalloc2 \
-  patchelf \
   procps \
   tini \
   tzdata \
   wget \
-  # Mastodon components
-  libexpat1 \
-  libglib2.0-0t64 \
-  libicu76 \
-  libidn12 \
+  # PostgreSQL client library (asyncpg runtime dep)
   libpq5 \
-  libreadline8t64 \
   libssl3t64 \
-  libyaml-0-2 \
-  # libvips components
+  # libvips runtime components
   libcgif0 \
   libexif12 \
   libheif1 \
@@ -132,7 +109,7 @@ RUN \
   libwebp7 \
   libwebpdemux2 \
   libwebpmux3 \
-  # ffmpeg components
+  # ffmpeg runtime components
   libdav1d7 \
   libmp3lame0 \
   libopencore-amrnb0 \
@@ -146,16 +123,10 @@ RUN \
   libvpx9 \
   libx264-164 \
   libx265-215 \
-  ; \
-  # Patch Ruby to use jemalloc
-  patchelf --add-needed libjemalloc.so.2 /usr/local/bin/ruby; \
-  # Discard patchelf after use
-  apt-get purge -y \
-  patchelf \
   ;
 
 # Build stage for media libraries (libvips, ffmpeg)
-FROM ${BASE_REGISTRY}/ruby:${RUBY_VERSION}-slim-${DEBIAN_VERSION} AS media-build
+FROM ${BASE_REGISTRY}/python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS media-build
 
 ARG TARGETPLATFORM
 
@@ -274,66 +245,47 @@ RUN \
   make -j"$(nproc)"; \
   make install;
 
-# Create temporary build layer from base image for Ruby dependencies
-FROM ruby AS ruby-build
+# Build Python dependencies with uv
+FROM python AS python-deps
 
 ARG TARGETPLATFORM
 
 # hadolint ignore=DL3008
 RUN \
-  # Mount Apt cache and lib directories from Docker buildx caches
   --mount=type=cache,id=apt-cache-${TARGETPLATFORM},target=/var/cache/apt,sharing=locked \
   --mount=type=cache,id=apt-lib-${TARGETPLATFORM},target=/var/lib/apt,sharing=locked \
-  # Install build tools and bundler dependencies from APT
   apt-get install -y --no-install-recommends \
   build-essential \
-  git \
-  libgdbm-dev \
-  libgmp-dev \
-  libicu-dev \
-  libidn-dev \
   libpq-dev \
   libssl-dev \
-  libyaml-dev \
-  shared-mime-info \
-  zlib1g-dev \
   ;
 
-# Create temporary bundler specific build layer from build layer
-FROM ruby-build AS bundler
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-ARG TARGETPLATFORM
+ENV UV_COMPILE_BYTECODE=1 \
+  UV_LINK_MODE=copy \
+  VIRTUAL_ENV=/opt/venv
 
-# Copy Gemfile config into working directory
-COPY Gemfile* /opt/mastodon/
-
-# Copy libvips for gems that need it during install
+# Copy libvips headers/libs needed by pyvips at install time
 COPY --from=libvips /usr/local/libvips/lib /usr/local/lib
 COPY --from=libvips /usr/local/libvips/include /usr/local/include
 
 RUN ldconfig
 
-RUN \
-  # Mount Ruby Gem caches
-  --mount=type=cache,id=gem-cache-${TARGETPLATFORM},target=/usr/local/bundle/cache/,sharing=locked \
-  # Configure bundle to prevent changes to Gemfile and Gemfile.lock
-  bundle config set --global frozen "true"; \
-  # Configure bundle to not cache downloaded Gems
-  bundle config set --global cache_all "false"; \
-  # Configure bundle to only process production Gems
-  bundle config set --local without "development test"; \
-  # Configure bundle to not warn about root user
-  bundle config set silence_root_warning "true"; \
-  # Download and install required Gems
-  bundle install -j"$(nproc)";
+# Install Python dependencies from lockfile into a named virtualenv
+COPY pyproject.toml uv.lock /opt/mastodon/
 
-# Create temporary assets build layer from build layer
-FROM ruby-build AS precompiler
+RUN \
+  --mount=type=cache,id=uv-cache-${TARGETPLATFORM},target=/root/.cache/uv,sharing=locked \
+  uv venv /opt/venv && \
+  cd /opt/mastodon && \
+  uv sync --frozen --no-dev --no-install-project --python /opt/venv/bin/python;
+
+# Build frontend assets
+FROM python AS assets
 
 ARG TARGETPLATFORM
-
-# Copy Mastodon sources into layer
-COPY . /opt/mastodon/
 
 # Copy Node.js binaries/libraries into layer
 COPY --from=node /usr/local/bin /usr/local/bin
@@ -348,45 +300,43 @@ RUN \
   # Install Corepack
   npm i -g corepack;
 
+# Copy Mastodon sources into layer
+COPY . /opt/mastodon/
+
 # hadolint ignore=DL3008
 RUN \
   --mount=type=cache,id=corepack-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/corepack,sharing=locked \
   --mount=type=cache,id=yarn-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/yarn,sharing=locked \
-  # Install Node.js packages
+  # Install Node.js packages (production only)
   yarn workspaces focus --production @mastodon/mastodon;
 
-# Copy libvips components into layer for precompiler
-COPY --from=libvips /usr/local/libvips/bin /usr/local/bin
-COPY --from=libvips /usr/local/libvips/lib /usr/local/lib
-# Copy bundler packages into layer for precompiler
-COPY --from=bundler /opt/mastodon /opt/mastodon/
-COPY --from=bundler /usr/local/bundle/ /usr/local/bundle/
-
 RUN \
-  ldconfig; \
-  # Use Ruby on Rails to create Mastodon assets
-  SECRET_KEY_BASE_DUMMY=1 \
-  bundle exec rails assets:precompile; \
+  --mount=type=cache,id=corepack-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/corepack,sharing=locked \
+  --mount=type=cache,id=yarn-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/yarn,sharing=locked \
+  # Build frontend assets
+  yarn build:production; \
   # Cleanup temporary files
   rm -fr /opt/mastodon/tmp;
 
-# Prep final Mastodon Ruby layer
-FROM ruby AS mastodon
+# Prep final Mastodon layer
+FROM python AS mastodon
 
 ARG TARGETPLATFORM
 
 # Copy Mastodon sources into final layer
 COPY . /opt/mastodon/
 
-# Copy compiled assets to layer
-COPY --from=precompiler /opt/mastodon/public/packs /opt/mastodon/public/packs
-COPY --from=precompiler /opt/mastodon/public/assets /opt/mastodon/public/assets
-# Copy bundler components to layer
-COPY --from=bundler /usr/local/bundle/ /usr/local/bundle/
-# Copy libvips components to layer
+# Copy compiled frontend assets
+COPY --from=assets /opt/mastodon/public/packs /opt/mastodon/public/packs
+COPY --from=assets /opt/mastodon/public/assets /opt/mastodon/public/assets
+# Copy installed Python virtualenv
+COPY --from=python-deps /opt/venv /opt/venv
+# Copy uv for runtime use (migrations, etc.)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Copy libvips components
 COPY --from=libvips /usr/local/libvips/bin /usr/local/bin
 COPY --from=libvips /usr/local/libvips/lib /usr/local/lib
-# Copy ffpmeg components to layer
+# Copy ffmpeg components
 COPY --from=ffmpeg /usr/local/ffmpeg/bin /usr/local/bin
 COPY --from=ffmpeg /usr/local/ffmpeg/lib /usr/local/lib
 
@@ -398,19 +348,22 @@ RUN \
   ffprobe -version;
 
 RUN \
-  # Precompile bootsnap code for faster Rails startup
-  bundle exec bootsnap precompile --gemfile app/ lib/;
-
-RUN \
-  # Pre-create and chown system volume to Mastodon user
+  # Pre-create and chown system volume to mastodon user
   mkdir -p /opt/mastodon/public/system; \
   chown mastodon:mastodon /opt/mastodon/public/system; \
-  # Set Mastodon user as owner of tmp folder
+  # Set mastodon user as owner of tmp folder
+  mkdir -p /opt/mastodon/tmp; \
   chown -R mastodon:mastodon /opt/mastodon/tmp;
+
+# Activate the virtualenv for all subsequent commands and the running container
+ENV VIRTUAL_ENV=/opt/venv \
+  PATH="/opt/venv/bin:${PATH}"
 
 # Set the running user for resulting container
 USER mastodon
-# Expose default Puma ports
-EXPOSE 3000
+# Expose default uvicorn port
+EXPOSE 8000
 # Set container tini as default entry point
 ENTRYPOINT ["/usr/bin/tini", "--"]
+# Default command: run the FastAPI app with uvicorn
+CMD ["uvicorn", "app.python.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

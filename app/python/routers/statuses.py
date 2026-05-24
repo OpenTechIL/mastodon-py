@@ -304,6 +304,10 @@ async def destroy(
         # Mastodon serves 404 on non-author delete to keep visibility
         # information from leaking.
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Record not found") from exc
+
+    from app.python.services.streaming import publish_delete
+    await publish_delete(row.id, account.id)
+
     relationships = await load_relationships(session, account.id, [row.id])
     return serialize_status(row, relationships=relationships)
 
@@ -433,6 +437,10 @@ async def reblog(
     # when we re-read them below.
     session.expire_all()
     hydrated = (await session.execute(select(Status).where(Status.id == wrapper_id))).scalar_one()
+
+    from app.python.services.streaming import publish_status
+    await publish_status(session, hydrated, account)
+
     relationships = await load_relationships(session, account.id, [wrapper_id, parent_id])
     return serialize_status(hydrated, relationships=relationships)
 

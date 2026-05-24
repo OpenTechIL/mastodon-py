@@ -115,6 +115,45 @@ const MotionIcon = () => (
 
 const CYCLE: ColorScheme[] = ['dark', 'auto', 'light'];
 
+/** Compact single-button theme cycler for use in column headers. */
+export const ThemeCycleButton: React.FC = () => {
+  const intl = useIntl();
+  const dispatch = useAppDispatch();
+  const colorScheme = useAppSelector(selectAppearanceColorScheme);
+
+  const handleClick = useCallback(() => {
+    const next =
+      CYCLE[(CYCLE.indexOf(colorScheme) + 1) % CYCLE.length] ?? 'auto';
+    applyColorScheme(next);
+    dispatch(changeSetting(['appearance', 'colorScheme'], next));
+  }, [dispatch, colorScheme]);
+
+  const label =
+    colorScheme === 'dark'
+      ? intl.formatMessage(messages.dark)
+      : colorScheme === 'light'
+        ? intl.formatMessage(messages.light)
+        : intl.formatMessage(messages.auto);
+
+  return (
+    <button
+      type='button'
+      className='column-header__button'
+      onClick={handleClick}
+      title={label}
+      aria-label={label}
+    >
+      {colorScheme === 'dark' ? (
+        <MoonIcon />
+      ) : colorScheme === 'light' ? (
+        <SunIcon />
+      ) : (
+        <AutoIcon />
+      )}
+    </button>
+  );
+};
+
 export const ThemeToggle: React.FC = () => {
   const intl = useIntl();
   const dispatch = useAppDispatch();

@@ -26,6 +26,7 @@ Activity shapes (abbreviated):
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -39,12 +40,26 @@ from app.python.federation.keys import ensure_local_actor_keys
 from app.python.lib.asset_urls import account_uri
 from app.python.models import (
     Account,
+    Block,
     Favourite,
     Follow,
     FollowRequest,
     Status,
     Visibility,
 )
+
+# Activity-level dedup: the AP spec says servers MUST NOT process an
+# activity with the same `id` more than once. We keep the last 10 000
+# seen activity IDs in memory. This is per-process, so a restart clears
+# it — that's acceptable because the underlying handlers are all
+# idempotent at the DB level. Using an OrderedDict as a bounded LRU set.
+_SEEN_ACTIVITY_IDS: OrderedDict[str, None] = OrderedDict()
+_SEEN_MAX = 10_000
+
+
+def clear_activity_dedup_cache() -> None:
+    """Empty the in-process dedup set. Intended for use in tests only."""
+    _SEEN_ACTIVITY_IDS.clear()
 
 if TYPE_CHECKING:
     import httpx
@@ -73,6 +88,16 @@ async def dispatch(
     author's other followers, etc. Optional because some handlers
     don't need it; tests can pass None for inbound-only checks.
     """
+    # Activity-level deduplication: spec requires MUST NOT process the
+    # same activity id twice. Check before any DB work.
+    activity_id = activity.get("id")
+    if isinstance(activity_id, str) and activity_id:
+        if activity_id in _SEEN_ACTIVITY_IDS:
+            return
+        _SEEN_ACTIVITY_IDS[activity_id] = None
+        if len(_SEEN_ACTIVITY_IDS) > _SEEN_MAX:
+            _SEEN_ACTIVITY_IDS.popitem(last=False)
+
     # Ensure the verified actor is in the DB before any handler runs.
     # Handlers downstream call `_resolve_remote_actor(session, …)`
     # which is a pure-DB lookup; this step fills the gap.
@@ -127,12 +152,13 @@ async def dispatch(
     elif activity_type == "Update":
         inner = activity.get("object")
         if isinstance(inner, dict):
-            # Mastodon emits Update for both actors (profile changes)
-            # and notes (status edits). Status-edit handler ports
-            # alongside `status_edits` history; actor update lands now.
             actor_types = {"Person", "Service", "Application", "Group", "Organization"}
             if inner.get("type") in actor_types:
                 await _handle_update_actor(session, actor_url, inner)
+            elif inner.get("type") in {"Note", "Article"}:
+                await _handle_update_note(session, actor_url, inner)
+    elif activity_type == "Block":
+        await _handle_block(session, actor_url, activity)
     # Every other type is a no-op for this slice.
 
 
@@ -901,6 +927,126 @@ def _shared_inbox(actor: dict[str, Any]) -> str:
         if isinstance(si, str):
             return si
     return ""
+
+
+async def _handle_update_note(
+    session: AsyncSession,
+    actor_url: str,
+    note: dict[str, Any],
+) -> None:
+    """Apply a remote status edit (Update wrapping a Note).
+
+    Finds the existing Status by URI, updates the mutable fields, and
+    stamps `edited_at`. Restricted to the verified actor's own content.
+    We don't store edit history rows (status_edits table) — that's a
+    future port — but we do update the live text so the current content
+    stays accurate.
+    """
+    author = await _resolve_remote_actor(session, actor_url)
+    if author is None:
+        return
+
+    uri = note.get("id")
+    if not isinstance(uri, str) or not uri:
+        return
+
+    attributed_to = note.get("attributedTo")
+    if isinstance(attributed_to, str) and attributed_to != actor_url:
+        return
+
+    row = (
+        await session.execute(
+            select(Status).where(
+                Status.uri == uri,
+                Status.account_id == author.id,
+                Status.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return
+
+    if isinstance(note.get("content"), str):
+        row.text = note["content"]
+    if isinstance(note.get("summary"), str):
+        row.spoiler_text = note["summary"]
+    if isinstance(note.get("sensitive"), bool):
+        row.sensitive = note["sensitive"]
+
+    content_map = note.get("contentMap")
+    if isinstance(content_map, dict) and content_map:
+        first = next(iter(content_map.keys()), None)
+        if isinstance(first, str):
+            row.language = first
+
+    row.edited_at = datetime.now(tz=UTC).replace(tzinfo=None)
+    row.updated_at = row.edited_at
+    await session.commit()
+
+
+async def _handle_block(
+    session: AsyncSession,
+    actor_url: str,
+    activity: dict[str, Any],
+) -> None:
+    """Record an inbound Block from a remote actor targeting a local user.
+
+    We store it in the `blocks` table so that follow-state cleanup and
+    federation filtering can reference it. Also tears down any existing
+    Follow / FollowRequest in either direction between the pair, which
+    is the expected Mastodon behaviour on receiving a remote Block.
+    """
+    blocker = await _resolve_remote_actor(session, actor_url)
+    if blocker is None:
+        return
+
+    target = await _resolve_local_target(session, activity.get("object"))
+    if target is None:
+        return
+
+    existing = (
+        await session.execute(
+            select(Block).where(
+                Block.account_id == blocker.id,
+                Block.target_account_id == target.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return  # idempotent
+
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
+    block_uri = activity.get("id") if isinstance(activity.get("id"), str) else None
+    session.add(
+        Block(
+            id=now_id(),
+            account_id=blocker.id,
+            target_account_id=target.id,
+            uri=block_uri,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+    # Tear down follow relationships in both directions
+    for follower_id, followed_id in [
+        (blocker.id, target.id),
+        (target.id, blocker.id),
+    ]:
+        await session.execute(
+            delete(Follow).where(
+                Follow.account_id == follower_id,
+                Follow.target_account_id == followed_id,
+            )
+        )
+        await session.execute(
+            delete(FollowRequest).where(
+                FollowRequest.account_id == follower_id,
+                FollowRequest.target_account_id == followed_id,
+            )
+        )
+
+    await session.commit()
 
 
 async def _handle_undo_announce_by_uri(

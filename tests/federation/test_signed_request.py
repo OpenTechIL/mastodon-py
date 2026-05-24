@@ -54,7 +54,6 @@ def _sign_post(
         body=body,
         key_id=f"{actor_url}#main-key",
         private_key_pem=priv,
-        now=datetime(2026, 5, 18, 12, 0, 0, tzinfo=timezone.utc),
     )
     return headers
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import os
+from functools import lru_cache
+from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
@@ -17,6 +19,21 @@ from sqlalchemy import select
 
 from app.python.deps import DBSession
 from app.python.settings import get_settings
+
+# Inline script content — resolved once at import time.
+_THEME_SELECTION_JS = (
+    Path(__file__).parent.parent.parent.parent
+    / "app/javascript/inline/theme-selection.js"
+).read_text()
+
+
+@lru_cache(maxsize=1)
+def _load_vite_manifest() -> dict:
+    """Read public/packs/.vite/manifest.json once and cache it."""
+    manifest_path = Path("public/packs/.vite/manifest.json")
+    if not manifest_path.exists():
+        return {}
+    return json.loads(manifest_path.read_text())
 
 router = APIRouter(tags=["web"])
 
@@ -137,7 +154,7 @@ async def _build_initial_state(request: Request, session) -> dict:
 
 def _asset_tags(env: str) -> str:
     if env == "production":
-        return ""
+        return _production_asset_tags()
     return """\
 <link rel="stylesheet" media="all" id="inert-style" crossorigin="anonymous" href="/packs-dev/styles/entrypoints/inert.scss" />
   <script type="module">
@@ -153,12 +170,62 @@ def _asset_tags(env: str) -> str:
   <script type="module" src="/packs-dev/entrypoints/application.ts"></script>"""
 
 
+def _production_asset_tags() -> str:
+    """Build script/link tags from the Vite production manifest."""
+    manifest = _load_vite_manifest()
+    if not manifest:
+        return ""
+
+    tags: list[str] = []
+
+    def _entry(key: str) -> dict:
+        return manifest.get(key, manifest.get(f"app/javascript/{key}", {}))
+
+    # inert.scss — CSS only, no JS
+    inert = _entry("styles/entrypoints/inert.scss")
+    if inert.get("file"):
+        tags.append(
+            f'<link rel="stylesheet" media="all" id="inert-style" crossorigin="anonymous" href="/packs/{inert["file"]}" />'
+        )
+
+    # common.ts — JS module + any extracted CSS
+    common = _entry("entrypoints/common.ts")
+    if common.get("file"):
+        for css in common.get("css", []):
+            tags.append(f'<link rel="stylesheet" media="all" crossorigin="anonymous" href="/packs/{css}" />')
+        tags.append(
+            f'<script type="module" crossorigin="anonymous" src="/packs/{common["file"]}"></script>'
+        )
+
+    # default theme (styles/application.scss)
+    theme = _entry("styles/application.scss")
+    if not theme:
+        theme = _entry("themes/default")
+    if theme.get("file"):
+        tags.append(
+            f'<link rel="stylesheet" media="all" crossorigin="anonymous" href="/packs/{theme["file"]}" />'
+        )
+
+    # application.ts — main app bundle + any extracted CSS
+    app = _entry("entrypoints/application.ts")
+    if app.get("file"):
+        for css in app.get("css", []):
+            tags.append(f'<link rel="stylesheet" media="all" crossorigin="anonymous" href="/packs/{css}" />')
+        tags.append(
+            f'<script type="module" crossorigin="anonymous" src="/packs/{app["file"]}"></script>'
+        )
+
+    return "\n  ".join(tags)
+
+
 def _html(initial_state: dict, color_scheme: str = "auto", high_contrast: bool = False) -> str:
     s = get_settings()
     domain = s.local_domain
     state_json = json.dumps(initial_state)
     asset_tags = _asset_tags(s.env)
     contrast_val = "high" if high_contrast else "default"
+    packs = "packs" if s.env == "production" else "packs-dev"
+    locale_preload = f'<link rel="preload" href="/{packs}/mastodon/locales/en.json" as="fetch" crossorigin="anonymous" />'
     # Set the preference on <html> so theme-selection.js can resolve it
     # ('auto' stays as-is; the inline script resolves it via matchMedia).
     return f"""<!DOCTYPE html>
@@ -168,10 +235,12 @@ def _html(initial_state: dict, color_scheme: str = "auto", high_contrast: bool =
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{domain}</title>
   <script id="initial-state" type="application/json">{state_json}</script>
+  <script>{_THEME_SELECTION_JS}</script>
+  {locale_preload}
   {asset_tags}
 </head>
 <body class="app-body">
-  <div id="mastodon" class="app-holder" data-props="{{}}" data-component="Mastodon"></div>
+  <div id="mastodon" class="notranslate app-holder" data-props="{{}}" data-component="Mastodon"></div>
   <noscript>
     <p>JavaScript is required to use Mastodon.</p>
   </noscript>

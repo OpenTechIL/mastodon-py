@@ -23,6 +23,7 @@ import { expandHomeTimeline } from '../../actions/timelines';
 import Column from '../../components/column';
 import ColumnHeader from '../../components/column_header';
 import StatusListContainer from '../ui/containers/status_list_container';
+import { ThemeCycleButton } from '../navigation_panel/components/theme_toggle';
 
 import { ColumnSettings } from './components/column_settings';
 import { CriticalUpdateBanner } from './components/critical_update_banner';
@@ -161,7 +162,7 @@ class HomeTimeline extends PureComponent {
           onClick={this.handleHeaderClick}
           pinned={pinned}
           multiColumn={multiColumn}
-          extraButton={announcementsButton}
+          extraButton={<>{announcementsButton}<ThemeCycleButton /></>}
           appendContent={hasAnnouncements && showAnnouncements && <Announcements />}
         >
           <ColumnSettings />

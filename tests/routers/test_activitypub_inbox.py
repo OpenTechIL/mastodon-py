@@ -22,8 +22,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import respx
 
+from app.python.federation.activity import clear_activity_dedup_cache
 from app.python.federation.signatures import sign_request
-from app.python.models import Account, Favourite, Follow, FollowRequest, Status, Visibility
+from app.python.models import Account, Block, Favourite, Follow, FollowRequest, Status, Visibility
+
+
+@pytest.fixture(autouse=True)
+def reset_activity_dedup() -> None:
+    """Clear the in-process activity-ID dedup cache between tests.
+
+    The cache is intentionally module-global (process-level) in production,
+    but tests reuse the same activity IDs across test functions — without
+    clearing, the second test that POSTs the same `id` would be a no-op.
+    """
+    clear_activity_dedup_cache()
 
 
 def _make_keypair() -> tuple[bytes, bytes]:
@@ -94,7 +106,7 @@ def _signed_headers(
         body=body,
         key_id=f"{actor_url}#main-key",
         private_key_pem=priv,
-        now=datetime(2026, 5, 18, 12, 0, 0, tzinfo=timezone.utc),
+        # Use current time so requests pass the ±12h date-skew check.
     )
     return headers
 
@@ -1577,3 +1589,191 @@ async def test_inbox_unrecognized_activity_type_is_noop(
         ),
     )
     assert response.status_code == 202
+
+
+# ---------- Update Note ----------
+
+
+@pytest.mark.asyncio
+async def test_inbox_update_note_edits_status(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+    keypair: tuple[bytes, bytes],
+) -> None:
+    """Update{Note} overwrites text and stamps edited_at."""
+    priv, pub = keypair
+    actor_url = await _seed_remote_alice(session_factory, seed_data, public_key=pub)
+    note_uri = "https://example.test/statuses/upd1"
+
+    # First: Create the status via a Create activity.
+    create_body = json.dumps({
+        "id": "https://example.test/activities/create-upd1",
+        "type": "Create",
+        "actor": actor_url,
+        "object": {
+            "id": note_uri,
+            "type": "Note",
+            "attributedTo": actor_url,
+            "content": "<p>original</p>",
+            "to": ["https://www.w3.org/ns/activitystreams#Public"],
+            "cc": [],
+        },
+    }).encode("utf-8")
+    await client.post(
+        "/inbox", content=create_body,
+        headers=_signed_headers(priv, actor_url=actor_url, host="test", path="/inbox", body=create_body),
+    )
+
+    # Then: Update the same note.
+    update_body = json.dumps({
+        "id": "https://example.test/activities/update-upd1",
+        "type": "Update",
+        "actor": actor_url,
+        "object": {
+            "id": note_uri,
+            "type": "Note",
+            "attributedTo": actor_url,
+            "content": "<p>edited</p>",
+            "to": ["https://www.w3.org/ns/activitystreams#Public"],
+            "cc": [],
+        },
+    }).encode("utf-8")
+    response = await client.post(
+        "/inbox", content=update_body,
+        headers=_signed_headers(priv, actor_url=actor_url, host="test", path="/inbox", body=update_body),
+    )
+    assert response.status_code == 202
+
+    async with session_factory() as s:
+        row = (await s.execute(select(Status).where(Status.uri == note_uri))).scalar_one()
+    assert row.text == "<p>edited</p>"
+    assert row.edited_at is not None
+
+
+@pytest.mark.asyncio
+async def test_inbox_update_note_rejects_wrong_actor(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+    keypair: tuple[bytes, bytes],
+) -> None:
+    """Update{Note} where attributedTo != signing actor is ignored."""
+    priv, pub = keypair
+    actor_url = await _seed_remote_alice(session_factory, seed_data, public_key=pub)
+    note_uri = "https://example.test/statuses/upd2"
+
+    create_body = json.dumps({
+        "id": "https://example.test/activities/create-upd2",
+        "type": "Create",
+        "actor": actor_url,
+        "object": {
+            "id": note_uri, "type": "Note", "attributedTo": actor_url,
+            "content": "<p>original</p>",
+            "to": ["https://www.w3.org/ns/activitystreams#Public"], "cc": [],
+        },
+    }).encode("utf-8")
+    await client.post(
+        "/inbox", content=create_body,
+        headers=_signed_headers(priv, actor_url=actor_url, host="test", path="/inbox", body=create_body),
+    )
+
+    update_body = json.dumps({
+        "id": "https://example.test/activities/update-upd2-bad",
+        "type": "Update",
+        "actor": actor_url,
+        "object": {
+            "id": note_uri, "type": "Note",
+            "attributedTo": "https://evil.test/users/impersonator",
+            "content": "<p>hijacked</p>",
+            "to": ["https://www.w3.org/ns/activitystreams#Public"], "cc": [],
+        },
+    }).encode("utf-8")
+    await client.post(
+        "/inbox", content=update_body,
+        headers=_signed_headers(priv, actor_url=actor_url, host="test", path="/inbox", body=update_body),
+    )
+
+    async with session_factory() as s:
+        row = (await s.execute(select(Status).where(Status.uri == note_uri))).scalar_one()
+    assert row.text == "<p>original</p>"  # not changed
+    assert row.edited_at is None
+
+
+# ---------- Block ----------
+
+
+@pytest.mark.asyncio
+async def test_inbox_block_stores_block_and_tears_down_follows(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+    keypair: tuple[bytes, bytes],
+) -> None:
+    """Block from remote actor targets local user → Block row created,
+    existing Follow/FollowRequest in both directions removed."""
+    priv, pub = keypair
+    actor_url = await _seed_remote_alice(session_factory, seed_data, public_key=pub)
+    await _seed_local_bob(session_factory, seed_data)
+
+    # Pre-seed a Follow: alice→bob (remote follows local)
+    async with session_factory() as s:
+        from datetime import datetime, timezone
+        alice = (await s.execute(select(Account).where(Account.uri == actor_url))).scalar_one()
+        bob = (await s.execute(select(Account).where(Account.username == "bob", Account.domain.is_(None)))).scalar_one()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        s.add(Follow(id=9901, account_id=alice.id, target_account_id=bob.id, created_at=now, updated_at=now))
+        await s.commit()
+
+    block_body = json.dumps({
+        "id": "https://example.test/blocks/1",
+        "type": "Block",
+        "actor": actor_url,
+        "object": "http://test/users/bob",
+    }).encode("utf-8")
+    response = await client.post(
+        "/inbox", content=block_body,
+        headers=_signed_headers(priv, actor_url=actor_url, host="test", path="/inbox", body=block_body),
+    )
+    assert response.status_code == 202
+
+    async with session_factory() as s:
+        blocks = (await s.execute(select(Block))).scalars().all()
+        follows = (await s.execute(select(Follow))).scalars().all()
+    assert len(blocks) == 1
+    assert len(follows) == 0  # torn down
+
+
+@pytest.mark.asyncio
+async def test_inbox_block_is_idempotent(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+    keypair: tuple[bytes, bytes],
+) -> None:
+    """Duplicate Block activities don't create duplicate Block rows."""
+    priv, pub = keypair
+    actor_url = await _seed_remote_alice(session_factory, seed_data, public_key=pub)
+    await _seed_local_bob(session_factory, seed_data)
+
+    block_body = json.dumps({
+        "id": "https://example.test/blocks/2",
+        "type": "Block",
+        "actor": actor_url,
+        "object": "http://test/users/bob",
+    }).encode("utf-8")
+    headers = _signed_headers(priv, actor_url=actor_url, host="test", path="/inbox", body=block_body)
+    await client.post("/inbox", content=block_body, headers=headers)
+
+    block_body2 = json.dumps({
+        "id": "https://example.test/blocks/2-b",  # different activity id, same block
+        "type": "Block",
+        "actor": actor_url,
+        "object": "http://test/users/bob",
+    }).encode("utf-8")
+    headers2 = _signed_headers(priv, actor_url=actor_url, host="test", path="/inbox", body=block_body2)
+    await client.post("/inbox", content=block_body2, headers=headers2)
+
+    async with session_factory() as s:
+        blocks = (await s.execute(select(Block))).scalars().all()
+    assert len(blocks) == 1

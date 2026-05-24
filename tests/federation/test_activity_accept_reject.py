@@ -10,8 +10,13 @@ import respx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.python.federation.activity import dispatch
+from app.python.federation.activity import clear_activity_dedup_cache, dispatch
 from app.python.models import Follow, FollowRequest
+
+
+@pytest.fixture(autouse=True)
+def reset_activity_dedup() -> None:
+    clear_activity_dedup_cache()
 
 
 _LOCAL_ALICE = "https://mastodon.test/users/alice"

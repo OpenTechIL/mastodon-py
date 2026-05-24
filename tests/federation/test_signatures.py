@@ -33,6 +33,9 @@ def rsa_keypair() -> tuple[bytes, bytes]:
     return private_pem, public_pem
 
 
+_SIGN_NOW = datetime(2026, 5, 18, 12, 0, 0, tzinfo=timezone.utc)
+
+
 def _build_post(rsa_keypair: tuple[bytes, bytes]) -> tuple[dict[str, str], bytes]:
     priv, _pub = rsa_keypair
     headers: dict[str, str] = {
@@ -47,7 +50,7 @@ def _build_post(rsa_keypair: tuple[bytes, bytes]) -> tuple[dict[str, str], bytes
         body=body,
         key_id="https://example.test/users/alice#main-key",
         private_key_pem=priv,
-        now=datetime(2026, 5, 18, 12, 0, 0, tzinfo=timezone.utc),
+        now=_SIGN_NOW,
     )
     return headers, body
 
@@ -79,6 +82,7 @@ def test_round_trip_verify_passes(rsa_keypair: tuple[bytes, bytes]) -> None:
         headers=headers,
         body=body,
         public_key_pem=pub,
+        now=_SIGN_NOW,
     )
 
 
@@ -97,6 +101,7 @@ def test_verify_fails_on_tampered_body(
         headers=headers,
         body=tampered,
         public_key_pem=pub,
+        now=_SIGN_NOW,
     )
 
 
@@ -116,6 +121,7 @@ def test_verify_fails_on_tampered_signature(
         headers=headers,
         body=body,
         public_key_pem=pub,
+        now=_SIGN_NOW,
     )
 
 
@@ -136,6 +142,7 @@ def test_verify_fails_with_wrong_public_key(
         headers=headers,
         body=body,
         public_key_pem=other_pub,
+        now=_SIGN_NOW,
     )
 
 
@@ -152,6 +159,7 @@ def test_verify_fails_on_path_mismatch(
         headers=headers,
         body=body,
         public_key_pem=pub,
+        now=_SIGN_NOW,
     )
 
 
@@ -167,6 +175,7 @@ def test_verify_fails_on_missing_signature_header(
         headers=headers,
         body=body,
         public_key_pem=pub,
+        now=_SIGN_NOW,
     )
 
 

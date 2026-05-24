@@ -20,10 +20,8 @@ const messages = defineMessages({
   close: { id: 'lightbox.close', defaultMessage: 'Close' },
 });
 
-const EMPTY_LIST = ImmutableList();
-
 const getAccountLanguages = createSelector([
-  (state, accountId) => state.getIn(['timelines', `account:${accountId}`, 'items'], EMPTY_LIST),
+  (state, accountId) => state.getIn(['timelines', `account:${accountId}`, 'items'], ImmutableList()),
   state => state.get('statuses'),
 ], (statusIds, statuses) =>
   ImmutableSet(statusIds.map(statusId => statuses.get(statusId)).filter(status => !status.get('reblog')).map(status => status.get('language'))));

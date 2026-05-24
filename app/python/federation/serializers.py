@@ -64,6 +64,7 @@ def serialize_note(status: Status, author: Account) -> dict:
     author_uri = account_uri(author)
     to, cc = _audience(status, author_uri)
     note: dict = {
+        "@context": _AS2_CONTEXT,
         "id": status.uri or f"{author_uri}/statuses/{status.id}",
         "type": "Note",
         "attributedTo": author_uri,

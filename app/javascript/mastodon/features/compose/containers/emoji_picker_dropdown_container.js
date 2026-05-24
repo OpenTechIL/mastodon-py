@@ -29,10 +29,8 @@ const DEFAULTS = [
   'ok_hand',
 ];
 
-const EMPTY_MAP = ImmutableMap();
-
 const getFrequentlyUsedEmojis = createSelector([
-  state => state.getIn(['settings', 'frequentlyUsedEmojis'], EMPTY_MAP),
+  state => state.getIn(['settings', 'frequentlyUsedEmojis'], ImmutableMap()),
 ], emojiCounters => {
   let emojis = emojiCounters
     .keySeq()

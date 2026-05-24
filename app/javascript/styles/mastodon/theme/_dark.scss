@@ -46,6 +46,7 @@
   --color-bg-overlay-base: #{utils.css-alpha(var(--color-grey-950), 60%)};
   --color-bg-overlay-highlight: #{utils.css-alpha(var(--color-white), 5%)};
   --color-bg-overlay: var(--color-black); // legacy
+  --color-surface-overlay-primary-pressed: var(--color-grey-800);
   --color-bg-media-base: var(--color-black); // legacy
   --color-bg-media: #{utils.css-alpha(var(--color-bg-media-base), 65%)}; // legacy
   --color-bg-disabled: var(--color-grey-700); // legacy
@@ -75,6 +76,9 @@
   /* BORDER TOKENS */
 
   --color-border-primary: var(--color-grey-800);
+  --color-border-secondary: var(--color-grey-700);
+  --color-focus-ring: var(--color-indigo-400);
+  --color-accent-color: var(--color-indigo-400);
   --color-border-brand: var(--color-text-brand);
   --color-border-brand-soft: var(--color-indigo-800);
   --color-border-error: var(--color-red-300);

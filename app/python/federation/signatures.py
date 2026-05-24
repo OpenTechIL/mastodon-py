@@ -37,8 +37,8 @@ import hashlib
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from email.utils import format_datetime
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime, parsedate_to_datetime
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -202,6 +202,7 @@ def verify_request(
     headers: Mapping[str, str],
     body: bytes,
     public_key_pem: bytes,
+    now: datetime | None = None,
 ) -> bool:
     """Verify the `Signature:` header against `public_key_pem`.
 
@@ -221,6 +222,18 @@ def verify_request(
         return False
 
     if parsed.algorithm.lower() != "rsa-sha256":
+        return False
+
+    # Reject requests whose Date is more than 12 hours from now — the
+    # Mastodon standard window. This closes a replay-attack vector where
+    # a validly-signed request captured in transit is re-posted later.
+    try:
+        date_str = _normalize_header_value("date", headers)
+        request_time = parsedate_to_datetime(date_str).astimezone(UTC)
+        reference = (now or datetime.now(tz=UTC))
+        if abs((reference - request_time).total_seconds()) > 43200:  # 12 hours
+            return False
+    except (KeyError, ValueError, OverflowError):
         return False
 
     # Reject the trivial trust gap: if the sender claimed to sign Digest

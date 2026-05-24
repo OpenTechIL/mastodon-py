@@ -386,8 +386,6 @@ export const NavigationPanel: React.FC<{ multiColumn?: boolean }> = ({
         )}
       </div>
 
-      <div className='flex-spacer' />
-
       <ThemeToggle />
 
       <Trends />

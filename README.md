@@ -214,8 +214,6 @@ AI-assisted contributions are governed by the project's [AI Contribution Policy]
 
 ## LICENSE
 
-Copyright (c) 2016-2025 Eugen Rochko (+ [`mastodon authors`](AUTHORS.md))
-
 Licensed under GNU Affero General Public License as stated in the [LICENSE](LICENSE):
 
 ```text

@@ -184,7 +184,7 @@ async def post_status(
         )
 
     await _link_hashtags(session, row, now=now)
-    await _link_mentions(session, row, author=author, now=now)
+    pending_mention_notifs = await _link_mentions(session, row, author=author, now=now)
     if media_ids:
         await _attach_media(session, status=row, author=author, media_ids=media_ids)
     if poll is not None:
@@ -195,9 +195,11 @@ async def post_status(
     await session.commit()
 
     # Live streaming: publish to Redis so the streaming server pushes to subscribed clients.
-    from app.python.services.streaming import publish_status
+    from app.python.services.streaming import publish_notification, publish_status
 
     await publish_status(session, row, author)
+    for notif_id, recipient_id in pending_mention_notifs:
+        await publish_notification(notif_id, recipient_id)
 
     # Outbound federation: deliver to remote followers after commit.
     # DIRECT/LIMITED don't fan out via followers — mentions handle
@@ -429,18 +431,21 @@ async def _link_mentions(
     *,
     author: Account,
     now: datetime,
-) -> None:
+) -> list[tuple[int, int]]:
     """Parse @-mentions, resolve to existing Accounts (skipping unknown
     remotes — webfinger lookup is deferred), insert Mention rows, and
     fire a `mention` notification per local recipient. Self-mentions
     don't get rows or notifications.
+
+    Returns a list of (notification_id, recipient_id) tuples so callers
+    can publish streaming events after commit.
     """
     from sqlalchemy import and_, or_
     from sqlalchemy import select as sa_select
 
     parsed = mentions.extract(status.text)
     if not parsed:
-        return
+        return []
 
     predicates = []
     for username, domain in parsed:
@@ -455,6 +460,7 @@ async def _link_mentions(
             )
     accounts = (await session.execute(sa_select(Account).where(or_(*predicates)))).scalars().all()
 
+    pending_notifications: list[tuple[int, int]] = []
     for account in accounts:
         if account.id == author.id:
             continue
@@ -471,10 +477,13 @@ async def _link_mentions(
         # `activity_id` points at the Mention row (legacy contract);
         # the notifications router's `_resolve_statuses` walks
         # Mention.id → status_id to surface the post.
-        await create_notification(
+        notif = await create_notification(
             session,
             recipient=account,
             actor=author,
             activity_id=mention.id,
             type=NotificationType.MENTION,
         )
+        if notif:
+            pending_notifications.append((notif.id, account.id))
+    return pending_notifications

@@ -35,6 +35,7 @@ from app.python.common.snowflake import now_id
 from app.python.models import Account, Status, StatusEdit
 from app.python.models.notification import NotificationType
 from app.python.services.notifications import create_local
+from app.python.services.streaming import publish_notification
 
 
 class StatusForbidden(Exception):
@@ -137,14 +138,19 @@ async def _notify_rebloggers(
         )
     ).scalars().all()
 
+    pending: list[tuple[int, int]] = []
     for recipient in boost_accounts:
-        await create_local(
+        notif = await create_local(
             session,
             recipient=recipient,
             actor=author,
             activity_id=status.id,
             type=NotificationType.UPDATE,
         )
+        if notif:
+            pending.append((notif.id, recipient.id))
 
     if boost_accounts:
         await session.commit()
+        for notif_id, recipient_id in pending:
+            await publish_notification(notif_id, recipient_id)

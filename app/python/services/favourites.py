@@ -36,6 +36,7 @@ from app.python.models import Account, Favourite, NotificationType, Status
 from app.python.policies.status_policy import visible_to
 from app.python.queue import Enqueuer
 from app.python.services.notifications import create_local as create_notification
+from app.python.services.streaming import publish_notification
 
 
 class StatusNotFound(Exception):
@@ -81,7 +82,7 @@ async def favourite(
         column="favourites_count",
         delta=1,
     )
-    await create_notification(
+    notif = await create_notification(
         session,
         recipient=status.account,
         actor=account,
@@ -89,6 +90,8 @@ async def favourite(
         type=NotificationType.FAVOURITE,
     )
     await session.commit()
+    if notif:
+        await publish_notification(notif.id, status.account.id)
     await _enqueue_outbound_like(session, enqueuer, source=account, status=status, favourite_id=row.id)
     return row
 

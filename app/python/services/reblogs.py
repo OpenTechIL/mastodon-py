@@ -40,6 +40,7 @@ from app.python.policies.status_policy import visible_to
 from app.python.queue import Enqueuer
 from app.python.services.favourites import StatusNotFound
 from app.python.services.notifications import create_local as create_notification
+from app.python.services.streaming import publish_notification
 
 
 def _root_of(status: Status) -> Status:
@@ -119,7 +120,7 @@ async def reblog(
         column="statuses_count",
         delta=1,
     )
-    await create_notification(
+    notif = await create_notification(
         session,
         recipient=parent.account,
         actor=account,
@@ -127,6 +128,8 @@ async def reblog(
         type=NotificationType.REBLOG,
     )
     await session.commit()
+    if notif:
+        await publish_notification(notif.id, parent.account.id)
     await _enqueue_outbound_announce(session, enqueuer, source=account, wrapper=wrapper, parent=parent)
     return wrapper
 

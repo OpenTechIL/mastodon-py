@@ -97,6 +97,22 @@ async def publish_status(
         logger.exception("Failed to publish status %s to Redis", status.id)
 
 
+async def publish_notification(notification_id: int, account_id: int) -> None:
+    """Publish a `notification` event to the account's notification channel."""
+    from app.python.settings import get_settings
+
+    s = get_settings()
+    ns = s.redis_namespace
+    message = json.dumps({"event": "notification", "payload": str(notification_id)})
+
+    try:
+        r = _redis_client()
+        async with r:
+            await r.publish(_ns(f"timeline:{account_id}:notifications", ns), message)
+    except Exception:
+        logger.exception("Failed to publish notification %s to Redis", notification_id)
+
+
 async def publish_delete(status_id: int, account_id: int) -> None:
     """Publish `delete` event to home timeline channel."""
     from app.python.settings import get_settings

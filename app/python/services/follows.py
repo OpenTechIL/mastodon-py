@@ -39,6 +39,7 @@ from app.python.lib.asset_urls import account_uri
 from app.python.models import Account, Block, Follow, FollowRequest, NotificationType
 from app.python.queue import Enqueuer
 from app.python.services.notifications import create_local as create_notification
+from app.python.services.streaming import publish_notification
 
 
 class SelfFollow(Exception):
@@ -123,7 +124,7 @@ async def follow(
         )
         session.add(req)
         await session.flush()
-        await create_notification(
+        notif = await create_notification(
             session,
             recipient=target,
             actor=source,
@@ -131,6 +132,8 @@ async def follow(
             type=NotificationType.FOLLOW_REQUEST,
         )
         await session.commit()
+        if notif:
+            await publish_notification(notif.id, target.id)
         await _enqueue_outbound_follow(session, enqueuer, source=source, target=target, follow_uri=follow_uri)
         return req
 
@@ -162,7 +165,7 @@ async def follow(
         column="followers_count",
         delta=1,
     )
-    await create_notification(
+    notif = await create_notification(
         session,
         recipient=target,
         actor=source,
@@ -170,6 +173,8 @@ async def follow(
         type=NotificationType.FOLLOW,
     )
     await session.commit()
+    if notif:
+        await publish_notification(notif.id, target.id)
     await _enqueue_outbound_follow(session, enqueuer, source=source, target=target, follow_uri=follow_uri)
     return follow_row
 

@@ -61,6 +61,7 @@ def clear_activity_dedup_cache() -> None:
     """Empty the in-process dedup set. Intended for use in tests only."""
     _SEEN_ACTIVITY_IDS.clear()
 
+
 if TYPE_CHECKING:
     import httpx
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -194,11 +195,11 @@ async def _authorize_follow_request(session: AsyncSession, request: FollowReques
             updated_at=now,
         )
     )
-    await session.execute(
-        delete(FollowRequest).where(FollowRequest.id == request.id)
-    )
+    await session.execute(delete(FollowRequest).where(FollowRequest.id == request.id))
     await adjust_counter(session, table="account_stats", row_id=request.account_id, column="following_count", delta=1)
-    await adjust_counter(session, table="account_stats", row_id=request.target_account_id, column="followers_count", delta=1)
+    await adjust_counter(
+        session, table="account_stats", row_id=request.target_account_id, column="followers_count", delta=1
+    )
     await session.commit()
 
 

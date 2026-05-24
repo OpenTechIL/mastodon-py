@@ -22,8 +22,7 @@ from app.python.settings import get_settings
 
 # Inline script content — resolved once at import time.
 _THEME_SELECTION_JS = (
-    Path(__file__).parent.parent.parent.parent
-    / "app/javascript/inline/theme-selection.js"
+    Path(__file__).parent.parent.parent.parent / "app/javascript/inline/theme-selection.js"
 ).read_text()
 
 
@@ -34,6 +33,7 @@ def _load_vite_manifest() -> dict:
     if not manifest_path.exists():
         return {}
     return json.loads(manifest_path.read_text())
+
 
 router = APIRouter(tags=["web"])
 
@@ -193,27 +193,21 @@ def _production_asset_tags() -> str:
     if common.get("file"):
         for css in common.get("css", []):
             tags.append(f'<link rel="stylesheet" media="all" crossorigin="anonymous" href="/packs/{css}" />')
-        tags.append(
-            f'<script type="module" crossorigin="anonymous" src="/packs/{common["file"]}"></script>'
-        )
+        tags.append(f'<script type="module" crossorigin="anonymous" src="/packs/{common["file"]}"></script>')
 
     # default theme (styles/application.scss)
     theme = _entry("styles/application.scss")
     if not theme:
         theme = _entry("themes/default")
     if theme.get("file"):
-        tags.append(
-            f'<link rel="stylesheet" media="all" crossorigin="anonymous" href="/packs/{theme["file"]}" />'
-        )
+        tags.append(f'<link rel="stylesheet" media="all" crossorigin="anonymous" href="/packs/{theme["file"]}" />')
 
     # application.ts — main app bundle + any extracted CSS
     app = _entry("entrypoints/application.ts")
     if app.get("file"):
         for css in app.get("css", []):
             tags.append(f'<link rel="stylesheet" media="all" crossorigin="anonymous" href="/packs/{css}" />')
-        tags.append(
-            f'<script type="module" crossorigin="anonymous" src="/packs/{app["file"]}"></script>'
-        )
+        tags.append(f'<script type="module" crossorigin="anonymous" src="/packs/{app["file"]}"></script>')
 
     return "\n  ".join(tags)
 
@@ -225,7 +219,9 @@ def _html(initial_state: dict, color_scheme: str = "auto", high_contrast: bool =
     asset_tags = _asset_tags(s.env)
     contrast_val = "high" if high_contrast else "default"
     packs = "packs" if s.env == "production" else "packs-dev"
-    locale_preload = f'<link rel="preload" href="/{packs}/mastodon/locales/en.json" as="fetch" crossorigin="anonymous" />'
+    locale_preload = (
+        f'<link rel="preload" href="/{packs}/mastodon/locales/en.json" as="fetch" crossorigin="anonymous" />'
+    )
     # Set the preference on <html> so theme-selection.js can resolve it
     # ('auto' stays as-is; the inline script resolves it via matchMedia).
     return f"""<!DOCTYPE html>

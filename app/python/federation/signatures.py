@@ -230,7 +230,7 @@ def verify_request(
     try:
         date_str = _normalize_header_value("date", headers)
         request_time = parsedate_to_datetime(date_str).astimezone(UTC)
-        reference = (now or datetime.now(tz=UTC))
+        reference = now or datetime.now(tz=UTC)
         if abs((reference - request_time).total_seconds()) > 43200:  # 12 hours
             return False
     except (KeyError, ValueError, OverflowError):

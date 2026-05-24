@@ -126,17 +126,21 @@ async def _notify_rebloggers(
     """Send `update` notifications to local accounts who reblogged this status."""
     # Find distinct local accounts that boosted this status (not yet soft-deleted).
     boost_accounts = (
-        await session.execute(
-            select(Account)
-            .join(Status, Status.account_id == Account.id)
-            .where(
-                Status.reblog_of_id == status.id,
-                Status.deleted_at.is_(None),
-                Account.domain.is_(None),  # local accounts only
+        (
+            await session.execute(
+                select(Account)
+                .join(Status, Status.account_id == Account.id)
+                .where(
+                    Status.reblog_of_id == status.id,
+                    Status.deleted_at.is_(None),
+                    Account.domain.is_(None),  # local accounts only
+                )
+                .distinct()
             )
-            .distinct()
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     pending: list[tuple[int, int]] = []
     for recipient in boost_accounts:

@@ -199,10 +199,26 @@ Counter-cache updates use `common/counter_cache.py → adjust_counter(session, t
 
 ### ActivityPub / federation
 
-- `federation/activity.py` — inbound activity dispatch
-- `federation/signatures.py` — HTTP signatures (RFC draft-cavage-10, not RFC 9421; Fediverse settled on the older variant)
-- `workers/delivery.py` — outbound signed POST to remote inboxes
-- Signature covers: `(request-target)`, `host`, `date`, `digest`, `content-type`; digest is SHA-256 of body
+Federation module map:
+
+| File                           | Role                                                                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `federation/activity.py`       | Inbound activity dispatch (`Create`, `Follow`, `Accept`, `Reject`, `Undo`, `Delete`, `Like`, `Announce`, `Update`, `Block`) |
+| `federation/serializers.py`    | Outbound AP JSON: `serialize_note()`, `serialize_create_activity()`                                                         |
+| `federation/signatures.py`     | HTTP signatures (draft-cavage-10). `sign_request()` / `verify_request(now=)`                                                |
+| `federation/signed_request.py` | Full inbound verification pipeline: parse → resolve key → verify                                                            |
+| `federation/actor_fetcher.py`  | Fetch + persist a remote actor on first contact                                                                             |
+| `federation/key_resolver.py`   | Resolve `keyId` → PEM; local DB first, HTTP fallback                                                                        |
+| `federation/keys.py`           | RSA keypair generation for local actors                                                                                     |
+| `federation/fanout.py`         | Deliver one activity to many recipient inboxes (batch)                                                                      |
+| `workers/delivery.py`          | arq job: sign + POST a single activity to a remote inbox                                                                    |
+
+Key invariants:
+
+- Signature covers `(request-target) host date digest content-type`; digest is SHA-256 of body.
+- `verify_request()` accepts an optional `now=` parameter — pass it in tests that use a frozen sign time to avoid the ±12 h date-skew rejection.
+- `activity.py` maintains an in-process activity-ID dedup set (`_SEEN_ACTIVITY_IDS`). Tests that dispatch the same activity ID across multiple test functions must call `clear_activity_dedup_cache()` in an autouse fixture, or use unique IDs.
+- `serialize_note()` includes `@context` so standalone Note object fetches (peer dereferencing a URI) are valid AP.
 
 When changing federated behavior, update both the inbound parser (`federation/activity.py`) and outbound serializer (`federation/serializers.py`).
 
@@ -218,6 +234,7 @@ When changing federated behavior, update both the inbound parser (`federation/ac
 - **API calls** — all go through `api.ts` (axios instance); don't fetch directly.
 - **Modal system** — `features/ui/components/modal_root.jsx` renders modals via `Bundle` (lazy loader). Only passes `ref` to class components and `forwardRef` components — not to plain function components.
 - **i18n** — wrap user-visible strings with `react-intl`. Run `yarn i18n:extract` after adding strings. Don't commit non-`en.json` locale files (Crowdin manages them).
+- **Theme toggle** — appearance preference (`dark` / `light` / `auto`) is stored in Redux settings under `appearance.colorScheme`. `selectAppearanceColorScheme` in `selectors/settings.ts` reads it; `ThemeCycleButton` (home column header) and `ThemeToggle` (navigation panel) let users cycle modes. CSS custom properties (`--color-bg-primary`, `--color-border-primary`, `--dropdown-shadow`, etc.) defined in `styles/mastodon/theme/_light.scss` and `_dark.scss` must be updated together when adding theme-aware components. The `auto` mode applies the OS `prefers-color-scheme` media query.
 
 ## Test setup
 

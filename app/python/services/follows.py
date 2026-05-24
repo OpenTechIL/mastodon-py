@@ -266,7 +266,7 @@ async def authorize_follow_request(
     )
     # Tell the requester their follow landed. (Recipient is `requester`,
     # actor is `target` — the acceptance came from the locked account.)
-    await create_notification(
+    notif = await create_notification(
         session,
         recipient=requester,
         actor=target,
@@ -274,6 +274,8 @@ async def authorize_follow_request(
         type=NotificationType.FOLLOW,
     )
     await session.commit()
+    if notif:
+        await publish_notification(notif.id, requester.id)
     return follow_row
 
 

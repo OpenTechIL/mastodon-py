@@ -52,7 +52,7 @@ jobs:
       file_to_build: Dockerfile
       push_to_images: |
         tootsuite/mastodon
-        ghcr.io/mastodon/mastodon
+        ghcr.io/opentechil/mastodon
       # Do not use cache when building releases, so apt update is always ran and the release always contain the latest packages
       cache: false
       # Only tag with latest when ran against the latest stable branch
@@ -71,7 +71,7 @@ jobs:
       file_to_build: streaming/Dockerfile
       push_to_images: |
         tootsuite/mastodon-streaming
-        ghcr.io/mastodon/mastodon-streaming
+        ghcr.io/opentechil/mastodon-streaming
       # Do not use cache when building releases, so apt update is always ran and the release always contain the latest packages
       cache: false
       # Only tag with latest when ran against the latest stable branch

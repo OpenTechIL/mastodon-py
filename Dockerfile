@@ -7,8 +7,6 @@
 # the extended buildx capabilities used in this file.
 # Make sure multiarch TARGETPLATFORM is available for interpolation
 # See: https://docs.docker.com/build/building/multi-platform/
-ARG TARGETPLATFORM=${TARGETPLATFORM}
-ARG BUILDPLATFORM=${BUILDPLATFORM}
 ARG BASE_REGISTRY="docker.io"
 
 # Python version to use, change with [--build-arg PYTHON_VERSION="3.13"]
@@ -242,7 +240,7 @@ RUN \
   --enable-shared \
   --enable-version3 \
   ; \
-  make -j"$(nproc)"; \
+  make -j"$(( $(nproc) > 4 ? 4 : $(nproc) ))"; \
   make install;
 
 # Build Python dependencies with uv

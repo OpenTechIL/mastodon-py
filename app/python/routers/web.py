@@ -72,9 +72,18 @@ async def _build_initial_state(request: Request, session) -> dict:
                 if ws:
                     web_settings_data = ws.data or {}
 
+    scheme = "wss" if s.env == "production" else "ws"
+    streaming_url = f"{scheme}://{s.effective_web_domain}"
+
     appearance = web_settings_data.get("appearance", {})
     reduce_motion = bool(appearance.get("reduceMotion", False))
     auto_play_gif = bool(appearance.get("autoPlayGif", False))
+    display_media = appearance.get("displayMedia", "default")
+    expand_spoilers = bool(appearance.get("expandSpoilers", False))
+    advanced_layout = bool(appearance.get("advancedLayout", False))
+    boost_modal = bool(appearance.get("boostModal", False))
+    delete_modal = bool(appearance.get("deleteModal", True))
+    default_privacy = web_settings_data.get("defaultPrivacy", "public")
 
     return {
         "meta": {
@@ -103,19 +112,19 @@ async def _build_initial_state(request: Request, session) -> dict:
             "remote_live_feed_access": "public",
             "local_topic_feed_access": "public",
             "remote_topic_feed_access": "public",
-            "streaming_api_base_url": f"ws://{domain}",
+            "streaming_api_base_url": streaming_url,
             "mascot": None,
             "reduce_motion": reduce_motion,
             "auto_play_gif": auto_play_gif,
-            "display_media": "default",
-            "expand_spoilers": False,
-            "advanced_layout": False,
-            "boost_modal": False,
-            "delete_modal": True,
+            "display_media": display_media,
+            "expand_spoilers": expand_spoilers,
+            "advanced_layout": advanced_layout,
+            "boost_modal": boost_modal,
+            "delete_modal": delete_modal,
             "use_blurhash": True,
             "use_pending_items": False,
         },
-        "compose": {"text": "", "default_privacy": "public"},
+        "compose": {"text": "", "default_privacy": default_privacy},
         "accounts": {},
         "media_attachments": {"accept_content_types": []},
         # Hydrate the Redux settings store with whatever we saved last time.

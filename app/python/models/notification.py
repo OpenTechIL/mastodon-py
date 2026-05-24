@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 class NotificationType(StrEnum):
     """Subset of Mastodon's notification types we generate today.
 
-    More types (`mention`, `poll`, `update`, `admin.sign_up`, `status`,
+    More types (`poll`, `admin.sign_up`, `status`,
     `quote`, `severed_relationships`, `moderation_warning`,
     `added_to_collection`, etc.) land alongside their producer phases.
     """
@@ -42,6 +42,7 @@ class NotificationType(StrEnum):
     FOLLOW = "follow"
     FOLLOW_REQUEST = "follow_request"
     MENTION = "mention"
+    UPDATE = "update"
 
 
 # Mapping from notification type to the Rails class name we must write
@@ -52,6 +53,7 @@ ACTIVITY_TYPE_FOR: dict[NotificationType, str] = {
     NotificationType.FOLLOW: "Follow",
     NotificationType.FOLLOW_REQUEST: "FollowRequest",
     NotificationType.MENTION: "Mention",
+    NotificationType.UPDATE: "Status",  # the edited Status itself
 }
 
 
@@ -101,4 +103,5 @@ class Notification(Base):
             NotificationType.FAVOURITE,
             NotificationType.REBLOG,
             NotificationType.MENTION,
+            NotificationType.UPDATE,
         )

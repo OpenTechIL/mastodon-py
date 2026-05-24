@@ -12,11 +12,11 @@ Mastodon enforces a few invariants on edit:
     phase.
   - **Snapshot before mutate.** Each edit appends a `StatusEdit` row
     capturing the pre-edit state; the history endpoint walks these.
+  - **`update` notifications.** Local accounts who reblogged the
+    edited status receive a notification of type `update`.
 
 Deferred:
 
-  - `update` notifications to accounts who favourited/reblogged/
-    bookmarked/replied (creates `Notification` rows of type `update`).
   - AP `Update` activity delivery to remote followers.
   - Media attachment / poll mutation — relies on those models porting.
   - Re-running mention / hashtag extraction on the new text.
@@ -28,10 +28,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.python.common.snowflake import now_id
 from app.python.models import Account, Status, StatusEdit
+from app.python.models.notification import NotificationType
+from app.python.services.notifications import create_local
 
 
 class StatusForbidden(Exception):
@@ -106,4 +109,42 @@ async def update_status(
     status.updated_at = now
 
     await session.commit()
+
+    # Notify local rebloggers about the edit.
+    await _notify_rebloggers(session, author=author, status=status)
+
     return status
+
+
+async def _notify_rebloggers(
+    session: AsyncSession,
+    *,
+    author: Account,
+    status: Status,
+) -> None:
+    """Send `update` notifications to local accounts who reblogged this status."""
+    # Find distinct local accounts that boosted this status (not yet soft-deleted).
+    boost_accounts = (
+        await session.execute(
+            select(Account)
+            .join(Status, Status.account_id == Account.id)
+            .where(
+                Status.reblog_of_id == status.id,
+                Status.deleted_at.is_(None),
+                Account.domain.is_(None),  # local accounts only
+            )
+            .distinct()
+        )
+    ).scalars().all()
+
+    for recipient in boost_accounts:
+        await create_local(
+            session,
+            recipient=recipient,
+            actor=author,
+            activity_id=status.id,
+            type=NotificationType.UPDATE,
+        )
+
+    if boost_accounts:
+        await session.commit()

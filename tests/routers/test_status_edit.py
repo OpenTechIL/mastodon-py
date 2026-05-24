@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.python.models import Status, StatusEdit
+from app.python.models import Notification, Status, StatusEdit
 
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
@@ -183,3 +183,39 @@ async def test_history_returns_snapshots_plus_current(
     body = response.json()
     contents = [row["content"] for row in body]
     assert contents == ["<p>hello</p>", "<p>v2</p>", "<p>v3</p>"]
+
+
+@pytest.mark.asyncio
+async def test_edit_notifies_local_rebloggers(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    """Local user who reblogged a status gets an `update` notification when it's edited."""
+    await _seed(session_factory, seed_data)
+    # bob has a user row so he's local
+    async with session_factory() as s:
+        s.add(seed_data["make_user"](id_=2, account_id=2))
+        # bob reblogged alice's status 100
+        s.add(seed_data["make_status"](id_=200, account_id=2, reblog_of_id=100))
+        s.add(seed_data["make_status_stat"](status_id=200))
+        await s.commit()
+
+    # alice edits her original status
+    edit_resp = await client.put(
+        "/api/v1/statuses/100", json={"status": "updated text"}, headers=_AUTH
+    )
+    assert edit_resp.status_code == 200
+
+    async with session_factory() as s:
+        notifs = (
+            await s.execute(
+                select(Notification).where(
+                    Notification.account_id == 2,
+                    Notification.type == "update",
+                )
+            )
+        ).scalars().all()
+    assert len(notifs) == 1
+    assert notifs[0].from_account_id == 1
+    assert notifs[0].activity_id == 100

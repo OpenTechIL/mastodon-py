@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.python.models import StatusTag, Tag, TagFollow, Visibility
+from app.python.models import FeaturedTag, StatusTag, Tag, TagFollow, Visibility
 
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
@@ -170,3 +170,60 @@ async def test_tag_timeline_returns_empty_for_unknown(client: AsyncClient) -> No
     response = await client.get("/api/v1/timelines/tag/never-posted")
     assert response.status_code == 200
     assert response.json() == []
+
+
+# ---------- tag feature / unfeature ----------
+
+
+@pytest.mark.asyncio
+async def test_tag_feature_creates_featured_tag(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    await client.post("/api/v1/statuses", json={"status": "#rust"}, headers=_AUTH)
+
+    response = await client.post("/api/v1/tags/rust/feature", headers=_AUTH)
+    assert response.status_code == 200
+    assert response.json()["name"] == "rust"
+
+    async with session_factory() as s:
+        rows = (await s.execute(select(FeaturedTag))).scalars().all()
+        assert len(rows) == 1
+        assert rows[0].account_id == 1
+
+
+@pytest.mark.asyncio
+async def test_tag_feature_is_idempotent(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    await client.post("/api/v1/statuses", json={"status": "#elixir"}, headers=_AUTH)
+
+    await client.post("/api/v1/tags/elixir/feature", headers=_AUTH)
+    await client.post("/api/v1/tags/elixir/feature", headers=_AUTH)
+
+    async with session_factory() as s:
+        rows = (await s.execute(select(FeaturedTag))).scalars().all()
+        assert len(rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_tag_unfeature_removes_featured_tag(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    await client.post("/api/v1/statuses", json={"status": "#erlang"}, headers=_AUTH)
+    await client.post("/api/v1/tags/erlang/feature", headers=_AUTH)
+
+    response = await client.post("/api/v1/tags/erlang/unfeature", headers=_AUTH)
+    assert response.status_code == 200
+
+    async with session_factory() as s:
+        rows = (await s.execute(select(FeaturedTag))).scalars().all()
+        assert rows == []

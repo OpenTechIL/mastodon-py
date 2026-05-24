@@ -8,7 +8,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.python.models import Visibility
+from app.python.models import MediaAttachment, StatusTag, Tag, Visibility
 
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
@@ -186,3 +186,71 @@ async def test_pagination_link_header(
     ids = [row["id"] for row in response.json()]
     assert ids == ["203", "202"]
     assert "max_id=202" in response.headers.get("Link", "")
+
+
+@pytest.mark.asyncio
+async def test_only_media_filter(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+    naive_now,
+) -> None:
+    await _seed_two_accounts(session_factory, seed_data)
+    async with session_factory() as s:
+        s.add(seed_data["make_status"](id_=200, account_id=2))
+        s.add(seed_data["make_status"](id_=201, account_id=2))
+        s.add(
+            MediaAttachment(
+                id=1,
+                status_id=201,
+                account_id=2,
+                type=1,  # IMAGE
+                remote_url="",
+                created_at=naive_now,
+                updated_at=naive_now,
+            )
+        )
+        await s.commit()
+
+    response = await client.get("/api/v1/accounts/2/statuses?only_media=true")
+    assert response.status_code == 200
+    ids = [row["id"] for row in response.json()]
+    assert ids == ["201"]
+
+
+@pytest.mark.asyncio
+async def test_tagged_filter(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+    naive_now,
+) -> None:
+    await _seed_two_accounts(session_factory, seed_data)
+    async with session_factory() as s:
+        s.add(seed_data["make_status"](id_=300, account_id=2))
+        s.add(seed_data["make_status"](id_=301, account_id=2))
+        tag = Tag(id=1, name="python", created_at=naive_now, updated_at=naive_now)
+        s.add(tag)
+        s.add(StatusTag(tag_id=1, status_id=301))
+        await s.commit()
+
+    response = await client.get("/api/v1/accounts/2/statuses?tagged=python")
+    assert response.status_code == 200
+    ids = [row["id"] for row in response.json()]
+    assert ids == ["301"]
+
+
+@pytest.mark.asyncio
+async def test_tagged_nonexistent_returns_empty(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed_two_accounts(session_factory, seed_data)
+    async with session_factory() as s:
+        s.add(seed_data["make_status"](id_=400, account_id=2))
+        await s.commit()
+
+    response = await client.get("/api/v1/accounts/2/statuses?tagged=nonexistenttag")
+    assert response.status_code == 200
+    assert response.json() == []

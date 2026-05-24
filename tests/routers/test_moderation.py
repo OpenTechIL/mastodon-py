@@ -202,6 +202,42 @@ async def test_domain_block_blank_is_422(
     assert response.status_code == 422
 
 
+# ---------- domain_blocks/preview ----------
+
+
+@pytest.mark.asyncio
+async def test_domain_block_preview_empty_domain(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    response = await client.get("/api/v1/domain_blocks/preview", headers=_AUTH)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["followers_count"] == 0
+    assert data["following_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_domain_block_preview_counts_relationships(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    seed_data: dict[str, Any],
+) -> None:
+    await _seed(session_factory, seed_data)
+    # alice follows eve (spam.social) — so blocking spam.social loses 1 following
+    await client.post("/api/v1/accounts/3/follow", headers=_AUTH)
+
+    response = await client.get(
+        "/api/v1/domain_blocks/preview?domain=spam.social", headers=_AUTH
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["following_count"] == 1
+    assert data["followers_count"] == 0
+
+
 # ---------- suggestions ----------
 
 

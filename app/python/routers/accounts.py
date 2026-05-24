@@ -26,9 +26,12 @@ from app.python.models import (
     AccountNote,
     AccountPin,
     Follow,
+    MediaAttachment,
     OAuthAccessToken,
     Status,
     StatusPin,
+    StatusTag,
+    Tag,
     User,
     Visibility,
 )
@@ -761,6 +764,22 @@ async def account_statuses(
         )
     if exclude_reblogs:
         stmt = stmt.where(Status.reblog_of_id.is_(None))
+    if only_media:
+        has_media = select(MediaAttachment.status_id).where(
+            MediaAttachment.status_id == Status.id
+        ).exists()
+        stmt = stmt.where(has_media)
+    if tagged:
+        tag_row = (
+            await session.execute(
+                select(Tag).where(Tag.name == tagged.lower().lstrip("#")).limit(1)
+            )
+        ).scalar_one_or_none()
+        if tag_row is None:
+            return []
+        stmt = stmt.join(StatusTag, StatusTag.status_id == Status.id).where(
+            StatusTag.tag_id == tag_row.id
+        )
 
     stmt = apply_pagination(stmt, Status.id, params)
     rows = (await session.execute(stmt)).unique().scalars().all()

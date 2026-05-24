@@ -53,6 +53,9 @@ dist/
 /redis
 /elasticsearch
 
+# Ignore Claude Code local files
+.claude/
+
 # Ignore Apple files
 .DS_Store
 

@@ -111,6 +111,19 @@ async def dispatch(
         target_uri = target.get("id") if isinstance(target, dict) else target
         if isinstance(target_uri, str):
             await _handle_delete_status(session, actor_url, target_uri)
+    elif activity_type == "Accept":
+        inner = activity.get("object")
+        if isinstance(inner, dict) and inner.get("type") == "Follow":
+            await _handle_accept_follow(session, actor_url, inner)
+        elif isinstance(inner, str):
+            # URI-only Accept — look up the pending FollowRequest by uri
+            await _handle_accept_follow_by_uri(session, actor_url, inner)
+    elif activity_type == "Reject":
+        inner = activity.get("object")
+        if isinstance(inner, dict) and inner.get("type") == "Follow":
+            await _handle_reject_follow(session, actor_url, inner)
+        elif isinstance(inner, str):
+            await _handle_reject_follow_by_uri(session, actor_url, inner)
     elif activity_type == "Update":
         inner = activity.get("object")
         if isinstance(inner, dict):
@@ -121,6 +134,136 @@ async def dispatch(
             if inner.get("type") in actor_types:
                 await _handle_update_actor(session, actor_url, inner)
     # Every other type is a no-op for this slice.
+
+
+async def _authorize_follow_request(session: AsyncSession, request: FollowRequest) -> None:
+    """Convert a pending FollowRequest to a Follow (accept path)."""
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
+    session.add(
+        Follow(
+            id=now_id(),
+            account_id=request.account_id,
+            target_account_id=request.target_account_id,
+            uri=request.uri,
+            show_reblogs=request.show_reblogs,
+            notify=request.notify,
+            languages=request.languages,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    await session.execute(
+        delete(FollowRequest).where(FollowRequest.id == request.id)
+    )
+    await adjust_counter(session, table="account_stats", row_id=request.account_id, column="following_count", delta=1)
+    await adjust_counter(session, table="account_stats", row_id=request.target_account_id, column="followers_count", delta=1)
+    await session.commit()
+
+
+async def _handle_accept_follow(
+    session: AsyncSession,
+    actor_url: str,
+    follow_obj: dict[str, Any],
+) -> None:
+    """Remote locked account accepted our local user's Follow.
+
+    actor = the remote account being followed (the one who sent Accept).
+    object = the embedded Follow activity that was originally sent by us.
+    The `actor` field on the inner Follow should be our local user's URI.
+    """
+    remote_account = await _resolve_remote_actor(session, actor_url)
+    if remote_account is None:
+        return
+    local_actor_uri = follow_obj.get("actor")
+    if not isinstance(local_actor_uri, str):
+        return
+    local_account = await _resolve_local_target(session, local_actor_uri)
+    if local_account is None:
+        return
+
+    request = (
+        await session.execute(
+            select(FollowRequest).where(
+                FollowRequest.account_id == local_account.id,
+                FollowRequest.target_account_id == remote_account.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if request is None:
+        return
+    await _authorize_follow_request(session, request)
+
+
+async def _handle_accept_follow_by_uri(
+    session: AsyncSession,
+    actor_url: str,
+    follow_uri: str,
+) -> None:
+    """Accept where the inner object is just the Follow URI string."""
+    remote_account = await _resolve_remote_actor(session, actor_url)
+    if remote_account is None:
+        return
+    request = (
+        await session.execute(
+            select(FollowRequest).where(
+                FollowRequest.uri == follow_uri,
+                FollowRequest.target_account_id == remote_account.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if request is None:
+        return
+    await _authorize_follow_request(session, request)
+
+
+async def _handle_reject_follow(
+    session: AsyncSession,
+    actor_url: str,
+    follow_obj: dict[str, Any],
+) -> None:
+    """Remote locked account rejected our local user's Follow request."""
+    remote_account = await _resolve_remote_actor(session, actor_url)
+    if remote_account is None:
+        return
+    local_actor_uri = follow_obj.get("actor")
+    if not isinstance(local_actor_uri, str):
+        return
+    local_account = await _resolve_local_target(session, local_actor_uri)
+    if local_account is None:
+        return
+
+    await session.execute(
+        delete(FollowRequest).where(
+            FollowRequest.account_id == local_account.id,
+            FollowRequest.target_account_id == remote_account.id,
+        )
+    )
+    # Also remove any already-promoted Follow (edge case: race with authorize)
+    await session.execute(
+        delete(Follow).where(
+            Follow.account_id == local_account.id,
+            Follow.target_account_id == remote_account.id,
+        )
+    )
+    await session.commit()
+
+
+async def _handle_reject_follow_by_uri(
+    session: AsyncSession,
+    actor_url: str,
+    follow_uri: str,
+) -> None:
+    """Reject where the inner object is just the Follow URI string."""
+    remote_account = await _resolve_remote_actor(session, actor_url)
+    if remote_account is None:
+        return
+    await session.execute(
+        delete(FollowRequest).where(
+            FollowRequest.uri == follow_uri,
+            FollowRequest.target_account_id == remote_account.id,
+        )
+    )
+    await session.commit()
 
 
 async def _resolve_local_target(session: AsyncSession, object_field: Any) -> Account | None:

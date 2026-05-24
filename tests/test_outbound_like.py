@@ -7,7 +7,6 @@ emits Undo Like with the original Like's URI cited.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
 import pytest
@@ -15,7 +14,6 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tests.conftest import FakeEnqueuer
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -60,7 +60,7 @@ async def _seed_follow(
     account_id: int,
     target_account_id: int,
 ) -> None:
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     async with session_factory() as s:
         s.add(
             Follow(

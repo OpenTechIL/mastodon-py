@@ -12,7 +12,6 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-
 _TEST_PUBLIC_KEY = (
     "-----BEGIN PUBLIC KEY-----\n"
     "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0\n"

@@ -8,19 +8,17 @@ network roundtrip.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import json
+from datetime import UTC
 from typing import Any
 
-import json
-
 import pytest
+import respx
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-import respx
 
 from app.python.federation.activity import clear_activity_dedup_cache
 from app.python.federation.signatures import sign_request
@@ -719,7 +717,6 @@ async def test_inbox_create_note_threads_reply_when_parent_known(
     """`inReplyTo` pointing at a Status we already have → set
     in_reply_to_id + reply=True. Unknown parents are stored as
     standalone toots."""
-    from datetime import datetime as _dt
 
     priv, pub = keypair
     actor_url = await _seed_remote_alice(
@@ -1230,6 +1227,7 @@ async def test_inbox_follow_to_unlocked_account_enqueues_accept(
     # Override alice's inbox URL so the Accept knows where to land.
     async with session_factory() as s:
         from sqlalchemy import select as _select
+
         from app.python.models import Account
         row = (
             await s.execute(_select(Account).where(Account.uri == actor_url))
@@ -1327,6 +1325,7 @@ async def test_repeat_follow_does_not_resend_accept(
     )
     async with session_factory() as s:
         from sqlalchemy import select as _select
+
         from app.python.models import Account
         row = (
             await s.execute(_select(Account).where(Account.uri == actor_url))
@@ -1718,10 +1717,10 @@ async def test_inbox_block_stores_block_and_tears_down_follows(
 
     # Pre-seed a Follow: alice→bob (remote follows local)
     async with session_factory() as s:
-        from datetime import datetime, timezone
+        from datetime import datetime
         alice = (await s.execute(select(Account).where(Account.uri == actor_url))).scalar_one()
         bob = (await s.execute(select(Account).where(Account.username == "bob", Account.domain.is_(None)))).scalar_one()
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         s.add(Follow(id=9901, account_id=alice.id, target_account_id=bob.id, created_at=now, updated_at=now))
         await s.commit()
 

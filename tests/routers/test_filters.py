@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -11,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import CustomFilter, CustomFilterKeyword, CustomFilterStatus
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
@@ -159,7 +158,7 @@ async def _make_filter(
     action: int = 0,
 ) -> int:
     """Helper: insert a CustomFilter + one keyword directly. Returns filter id."""
-    ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    ts = datetime.now(tz=UTC).replace(tzinfo=None)
     async with session_factory() as s:
         from app.python.common.snowflake import now_id
 
@@ -247,7 +246,7 @@ async def test_expired_filter_is_ignored(
     seed_data: dict[str, Any],
 ) -> None:
     await _seed(session_factory, seed_data)
-    yesterday = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+    yesterday = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(days=1)
     await _make_filter(
         session_factory,
         account_id=1,
@@ -313,7 +312,7 @@ async def test_explicit_status_match(
     async with session_factory() as s:
         from app.python.common.snowflake import now_id
 
-        ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             CustomFilterStatus(
                 id=now_id(),

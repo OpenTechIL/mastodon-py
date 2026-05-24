@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -12,12 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import Follow, List, ListAccount
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
 
 def _make_follow(follow_id: int, *, follower: int, target: int) -> Follow:
-    ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    ts = datetime.now(tz=UTC).replace(tzinfo=None)
     return Follow(
         id=follow_id,
         account_id=follower,
@@ -113,7 +112,7 @@ async def test_show_other_owners_list_is_404(
     """Bob owns a list; alice (the token holder) can't see it."""
     await _seed(session_factory, seed_data)
     async with session_factory() as s:
-        ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             List(
                 id=99,

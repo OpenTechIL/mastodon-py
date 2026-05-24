@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -72,11 +71,10 @@ async def test_local_hit_skips_http(
     async with respx.mock(assert_all_called=False) as router:
         # No route registered — any HTTP call would 502. Local hit
         # means we never make one.
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                result = await resolve_public_key(
-                    key_id=key_id, session=s, http_client=client
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            result = await resolve_public_key(
+                key_id=key_id, session=s, http_client=client
+            )
         assert result == pub
         assert not any(call.has_response for call in router.calls)
 
@@ -104,11 +102,10 @@ async def test_remote_fetch_returns_pem(
             json=actor_json,
             headers={"content-type": "application/activity+json"},
         )
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                result = await resolve_public_key(
-                    key_id=key_id, session=s, http_client=client
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            result = await resolve_public_key(
+                key_id=key_id, session=s, http_client=client
+            )
         assert result == pub
         assert router.calls.call_count == 1
 
@@ -121,7 +118,7 @@ async def test_remote_fetch_picks_matching_key_from_list(
     """Actors may advertise multiple keys (rotation). The resolver
     picks the one whose `id` matches the keyId in the signature."""
     _priv, target_pub = keypair
-    other_priv, other_pub = _make_keypair()
+    _other_priv, other_pub = _make_keypair()
     actor_url = "https://other.test/users/bob"
     target_key_id = f"{actor_url}#main-key"
     actor_json = {
@@ -140,11 +137,10 @@ async def test_remote_fetch_picks_matching_key_from_list(
 
     async with respx.mock() as router:
         router.get(actor_url).respond(json=actor_json)
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                result = await resolve_public_key(
-                    key_id=target_key_id, session=s, http_client=client
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            result = await resolve_public_key(
+                key_id=target_key_id, session=s, http_client=client
+            )
         assert result == target_pub
         # Sanity: the other key was an option but not picked.
         assert result != other_pub
@@ -158,11 +154,10 @@ async def test_remote_fetch_returns_none_on_404(
     key_id = f"{actor_url}#main-key"
     async with respx.mock() as router:
         router.get(actor_url).respond(status_code=404)
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                result = await resolve_public_key(
-                    key_id=key_id, session=s, http_client=client
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            result = await resolve_public_key(
+                key_id=key_id, session=s, http_client=client
+            )
         assert result is None
 
 
@@ -176,11 +171,10 @@ async def test_remote_fetch_returns_none_on_missing_public_key_field(
         router.get(actor_url).respond(
             json={"id": actor_url, "type": "Person"}
         )
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                result = await resolve_public_key(
-                    key_id=key_id, session=s, http_client=client
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            result = await resolve_public_key(
+                key_id=key_id, session=s, http_client=client
+            )
         assert result is None
 
 
@@ -199,11 +193,10 @@ async def test_remote_fetch_returns_none_on_invalid_pem(
                 "publicKey": {"id": key_id, "publicKeyPem": "not-a-pem"},
             }
         )
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                result = await resolve_public_key(
-                    key_id=key_id, session=s, http_client=client
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            result = await resolve_public_key(
+                key_id=key_id, session=s, http_client=client
+            )
         assert result is None
 
 
@@ -212,11 +205,10 @@ async def test_non_http_scheme_returns_none(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """A keyId that isn't an http(s) URL never triggers a fetch."""
-    async with session_factory() as s:
-        async with httpx.AsyncClient() as client:
-            result = await resolve_public_key(
-                key_id="acct:alice@example.test", session=s, http_client=client
-            )
+    async with session_factory() as s, httpx.AsyncClient() as client:
+        result = await resolve_public_key(
+            key_id="acct:alice@example.test", session=s, http_client=client
+        )
     assert result is None
 
 
@@ -244,10 +236,9 @@ async def test_local_hit_with_empty_public_key_falls_back_to_http(
     }
     async with respx.mock() as router:
         router.get(actor_url).respond(json=actor_json)
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                result = await resolve_public_key(
-                    key_id=key_id, session=s, http_client=client
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            result = await resolve_public_key(
+                key_id=key_id, session=s, http_client=client
+            )
         assert result == pub
         assert router.calls.call_count == 1

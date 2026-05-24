@@ -102,26 +102,42 @@ async def dispatch(
     # Handlers downstream call `_resolve_remote_actor(session, …)`
     # which is a pure-DB lookup; this step fills the gap.
     await fetch_and_persist_actor(session, http_client, actor_url)
+    await _route_activity(session=session, enqueuer=enqueuer, actor_url=actor_url, activity=activity)
 
+
+async def _route_undo(
+    session: AsyncSession,
+    actor_url: str,
+    inner: Any,
+) -> None:
+    if isinstance(inner, dict):
+        inner_type = inner.get("type")
+        if inner_type == "Follow":
+            await _handle_undo_follow(session, actor_url, inner)
+        elif inner_type == "Like":
+            await _handle_undo_like(session, actor_url, inner)
+        elif inner_type == "Announce":
+            await _handle_undo_announce(session, actor_url, inner)
+    elif isinstance(inner, str):
+        # URI-only Undo: we don't know which kind without fetching
+        # the original. Best-effort: try each kind of row, scoped
+        # to the verified actor so we can't undo someone else's.
+        await _handle_undo_follow_by_uri(session, actor_url, inner)
+        await _handle_undo_announce_by_uri(session, actor_url, inner)
+
+
+async def _route_activity(
+    *,
+    session: AsyncSession,
+    enqueuer: Enqueuer | None,
+    actor_url: str,
+    activity: dict[str, Any],
+) -> None:
     activity_type = activity.get("type")
     if activity_type == "Follow":
         await _handle_follow(session, actor_url, activity, enqueuer)
     elif activity_type == "Undo":
-        inner = activity.get("object")
-        if isinstance(inner, dict):
-            inner_type = inner.get("type")
-            if inner_type == "Follow":
-                await _handle_undo_follow(session, actor_url, inner)
-            elif inner_type == "Like":
-                await _handle_undo_like(session, actor_url, inner)
-            elif inner_type == "Announce":
-                await _handle_undo_announce(session, actor_url, inner)
-        elif isinstance(inner, str):
-            # URI-only Undo: we don't know which kind without fetching
-            # the original. Best-effort: try each kind of row, scoped
-            # to the verified actor so we can't undo someone else's.
-            await _handle_undo_follow_by_uri(session, actor_url, inner)
-            await _handle_undo_announce_by_uri(session, actor_url, inner)
+        await _route_undo(session, actor_url, activity.get("object"))
     elif activity_type == "Create":
         inner = activity.get("object")
         if isinstance(inner, dict) and inner.get("type") in {"Note", "Article"}:

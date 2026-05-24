@@ -33,7 +33,7 @@ def _actor_json(actor_url: str) -> dict[str, Any]:
     return {
         "id": actor_url,
         "type": "Person",
-        "preferredUsername": actor_url.split("/")[-1],
+        "preferredUsername": actor_url.rsplit("/", maxsplit=1)[-1],
         "name": "Bob",
         "inbox": f"{actor_url}/inbox",
         "publicKey": {"id": f"{actor_url}#key", "owner": actor_url, "publicKeyPem": _PEM},
@@ -70,9 +70,10 @@ async def _seed_follow_request(
     follow_uri: str = "https://mastodon.test/users/alice#follows/100",
 ) -> None:
     async with session_factory() as s:
-        from app.python.models import FollowRequest
+        from datetime import UTC, datetime
+
         from app.python.common.snowflake import now_id
-        from datetime import datetime, UTC
+        from app.python.models import FollowRequest
         now = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             FollowRequest(
@@ -111,16 +112,14 @@ async def test_accept_follow_promotes_request_to_follow(
         },
     }
 
-    async with respx.mock(assert_all_called=False):
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                await dispatch(
-                    session=s,
-                    http_client=client,
-                    enqueuer=None,
-                    actor_url=_REMOTE_BOB,
-                    activity=accept_activity,
-                )
+    async with respx.mock(assert_all_called=False), session_factory() as s, httpx.AsyncClient() as client:
+        await dispatch(
+            session=s,
+            http_client=client,
+            enqueuer=None,
+            actor_url=_REMOTE_BOB,
+            activity=accept_activity,
+        )
 
     async with session_factory() as s:
         requests = (await s.execute(select(FollowRequest))).scalars().all()
@@ -149,16 +148,14 @@ async def test_accept_follow_by_uri(
         "object": follow_uri,  # URI-only
     }
 
-    async with respx.mock(assert_all_called=False):
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                await dispatch(
-                    session=s,
-                    http_client=client,
-                    enqueuer=None,
-                    actor_url=_REMOTE_BOB,
-                    activity=accept_activity,
-                )
+    async with respx.mock(assert_all_called=False), session_factory() as s, httpx.AsyncClient() as client:
+        await dispatch(
+            session=s,
+            http_client=client,
+            enqueuer=None,
+            actor_url=_REMOTE_BOB,
+            activity=accept_activity,
+        )
 
     async with session_factory() as s:
         follows = (await s.execute(select(Follow))).scalars().all()
@@ -186,16 +183,14 @@ async def test_reject_follow_removes_request(
         },
     }
 
-    async with respx.mock(assert_all_called=False):
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                await dispatch(
-                    session=s,
-                    http_client=client,
-                    enqueuer=None,
-                    actor_url=_REMOTE_BOB,
-                    activity=reject_activity,
-                )
+    async with respx.mock(assert_all_called=False), session_factory() as s, httpx.AsyncClient() as client:
+        await dispatch(
+            session=s,
+            http_client=client,
+            enqueuer=None,
+            actor_url=_REMOTE_BOB,
+            activity=reject_activity,
+        )
 
     async with session_factory() as s:
         requests = (await s.execute(select(FollowRequest))).scalars().all()
@@ -226,16 +221,14 @@ async def test_accept_follow_is_idempotent(
         },
     }
 
-    async with respx.mock(assert_all_called=False):
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                await dispatch(
-                    session=s,
-                    http_client=client,
-                    enqueuer=None,
-                    actor_url=_REMOTE_BOB,
-                    activity=accept_activity,
-                )
+    async with respx.mock(assert_all_called=False), session_factory() as s, httpx.AsyncClient() as client:
+        await dispatch(
+            session=s,
+            http_client=client,
+            enqueuer=None,
+            actor_url=_REMOTE_BOB,
+            activity=accept_activity,
+        )
 
     async with session_factory() as s:
         follows = (await s.execute(select(Follow))).scalars().all()

@@ -9,8 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.python.models import Mention, Notification, Visibility
-
+from app.python.models import Mention, Notification
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 _BOB_TOKEN = "bob-token"

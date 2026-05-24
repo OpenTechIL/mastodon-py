@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import MediaAttachment, StatusTag, Tag, Visibility
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
 

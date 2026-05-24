@@ -78,15 +78,14 @@ async def test_run_delivers_to_each_inbox(
     async with respx.mock() as router:
         for u in urls:
             router.post(u).respond(202)
-        async with session_factory() as session:
-            async with httpx.AsyncClient() as client:
-                report = await _run(
-                    session,
-                    client,
-                    activity={"type": "Follow"},
-                    sender_account_id=sender_id,
-                    inbox_urls=urls,
-                )
+        async with session_factory() as session, httpx.AsyncClient() as client:
+            report = await _run(
+                session,
+                client,
+                activity={"type": "Follow"},
+                sender_account_id=sender_id,
+                inbox_urls=urls,
+            )
     assert report.attempts == 3
     assert report.successes == 3
     assert report.failures == 0
@@ -98,15 +97,14 @@ async def test_run_returns_zero_report_when_sender_missing(
 ) -> None:
     async with respx.mock(assert_all_called=False) as router:
         route = router.post("https://a.test/inbox").respond(202)
-        async with session_factory() as session:
-            async with httpx.AsyncClient() as client:
-                report = await _run(
-                    session,
-                    client,
-                    activity={"type": "Follow"},
-                    sender_account_id=999_999,
-                    inbox_urls=["https://a.test/inbox"],
-                )
+        async with session_factory() as session, httpx.AsyncClient() as client:
+            report = await _run(
+                session,
+                client,
+                activity={"type": "Follow"},
+                sender_account_id=999_999,
+                inbox_urls=["https://a.test/inbox"],
+            )
     assert report.attempts == 0
     # Defensive: we never POSTed since the sender wasn't loadable.
     assert not route.called
@@ -132,15 +130,14 @@ async def test_run_skips_sender_with_no_private_key(
 
     async with respx.mock(assert_all_called=False) as router:
         route = router.post("https://a.test/inbox").respond(202)
-        async with session_factory() as session:
-            async with httpx.AsyncClient() as client:
-                report = await _run(
-                    session,
-                    client,
-                    activity={"type": "Follow"},
-                    sender_account_id=1,
-                    inbox_urls=["https://a.test/inbox"],
-                )
+        async with session_factory() as session, httpx.AsyncClient() as client:
+            report = await _run(
+                session,
+                client,
+                activity={"type": "Follow"},
+                sender_account_id=1,
+                inbox_urls=["https://a.test/inbox"],
+            )
     assert report.attempts == 0
     assert not route.called
 
@@ -161,19 +158,18 @@ async def test_run_reports_mixed_results(
         router.post("https://c.test/inbox").mock(
             side_effect=httpx.ConnectError("dns")
         )
-        async with session_factory() as session:
-            async with httpx.AsyncClient() as client:
-                report = await _run(
-                    session,
-                    client,
-                    activity={"type": "Follow"},
-                    sender_account_id=sender_id,
-                    inbox_urls=[
-                        "https://a.test/inbox",
-                        "https://b.test/inbox",
-                        "https://c.test/inbox",
-                    ],
-                )
+        async with session_factory() as session, httpx.AsyncClient() as client:
+            report = await _run(
+                session,
+                client,
+                activity={"type": "Follow"},
+                sender_account_id=sender_id,
+                inbox_urls=[
+                    "https://a.test/inbox",
+                    "https://b.test/inbox",
+                    "https://c.test/inbox",
+                ],
+            )
     assert report.attempts == 3
     assert report.successes == 1
     assert report.failures == 2

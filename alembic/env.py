@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 import app.python.models  # noqa: F401 — registers all models with Base.metadata
+from alembic import context
 from app.python.db import Base
 from app.python.settings import get_settings
 

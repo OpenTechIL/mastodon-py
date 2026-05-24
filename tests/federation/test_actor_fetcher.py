@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.python.federation.actor_fetcher import fetch_and_persist_actor
 from app.python.models import Account
 
-
 _PEM = (
     "-----BEGIN PUBLIC KEY-----\n"
     "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0\n"
@@ -51,9 +50,8 @@ async def test_fetch_inserts_new_account(
     actor_url = "https://other.test/users/carol"
     async with respx.mock() as router:
         router.get(actor_url).respond(json=_actor_json(actor_url))
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                row = await fetch_and_persist_actor(s, client, actor_url)
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            row = await fetch_and_persist_actor(s, client, actor_url)
         assert row is not None
         assert row.username == "carol"
         assert row.domain == "other.test"
@@ -83,9 +81,8 @@ async def test_fetch_returns_existing_without_http(
 
     async with respx.mock(assert_all_called=False) as router:
         route = router.get(actor_url)
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                row = await fetch_and_persist_actor(s, client, actor_url)
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            row = await fetch_and_persist_actor(s, client, actor_url)
         assert row is not None
         assert row.id == 1
         assert not route.called
@@ -98,9 +95,8 @@ async def test_fetch_returns_none_on_404(
     actor_url = "https://other.test/users/missing"
     async with respx.mock() as router:
         router.get(actor_url).respond(status_code=404)
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                row = await fetch_and_persist_actor(s, client, actor_url)
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            row = await fetch_and_persist_actor(s, client, actor_url)
         assert row is None
 
 
@@ -115,9 +111,8 @@ async def test_fetch_returns_none_when_preferredUsername_missing(
         router.get(actor_url).respond(
             json={"id": actor_url, "type": "Person", "inbox": f"{actor_url}/inbox"}
         )
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                row = await fetch_and_persist_actor(s, client, actor_url)
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            row = await fetch_and_persist_actor(s, client, actor_url)
         assert row is None
         async with session_factory() as s:
             rows = (await s.execute(select(Account))).scalars().all()
@@ -128,7 +123,6 @@ async def test_fetch_returns_none_when_preferredUsername_missing(
 async def test_fetch_returns_none_on_non_http_url(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    async with session_factory() as s:
-        async with httpx.AsyncClient() as client:
-            row = await fetch_and_persist_actor(s, client, "acct:user@host")
+    async with session_factory() as s, httpx.AsyncClient() as client:
+        row = await fetch_and_persist_actor(s, client, "acct:user@host")
     assert row is None

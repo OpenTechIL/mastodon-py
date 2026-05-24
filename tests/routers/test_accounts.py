@@ -56,7 +56,7 @@ async def test_verify_credentials_returns_account(
     assert body["statuses_count"] == 3
     assert body["followers_count"] == 10
     assert body["following_count"] == 5
-    assert "<p>hello there</p>" == body["note"]
+    assert body["note"] == "<p>hello there</p>"
     assert body["avatar"].endswith("/avatars/original/missing.png")
 
 

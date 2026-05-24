@@ -6,7 +6,7 @@ inbox (when remote), deduped.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -15,9 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.common.snowflake import now_id
 from app.python.models import Follow
-
 from tests.conftest import FakeEnqueuer
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
@@ -83,7 +81,7 @@ async def _seed_remote_follower(
             )
         )
         s.add(seed_data["make_account_stat"](account_id=id_))
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             Follow(
                 id=now_id(),

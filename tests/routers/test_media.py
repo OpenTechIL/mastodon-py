@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import MediaAttachment
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 _BOB_TOKEN = "bob-token"
 _BOB_AUTH = {"Authorization": f"Bearer {_BOB_TOKEN}"}
@@ -104,7 +103,7 @@ async def test_upload_creates_row_and_writes_file(
         assert rows[0].file_file_size > 0
         # The file landed under the tempdir.
         found = False
-        for root, _dirs, files in os.walk(_media_root_tmpdir):
+        for _root, _dirs, files in os.walk(_media_root_tmpdir):
             if "hello.png" in files:
                 found = True
                 break
@@ -323,7 +322,7 @@ async def test_upload_generates_small_variant_and_meta(
     assert meta["small"]["height"] <= 400
     # Both files actually written.
     files_on_disk: list[str] = []
-    for root, _dirs, files in os.walk(_media_root_tmpdir):
+    for _root, _dirs, files in os.walk(_media_root_tmpdir):
         files_on_disk.extend(files)
     assert files_on_disk.count("big.png") == 2
 
@@ -459,7 +458,7 @@ async def test_upload_animated_gif_preserves_frames_and_meta(
             if name != "anim.gif":
                 continue
             full = os.path.join(root, name)
-            with open(full, "rb") as fh:
+            with open(full, "rb") as fh:  # noqa: ASYNC230
                 blob = fh.read()
             if "/original/" in full:
                 saved_original = blob
@@ -474,8 +473,8 @@ async def test_upload_animated_gif_preserves_frames_and_meta(
 
 def _make_jpeg_with_exif() -> bytes:
     """JPEG carrying GPS EXIF — the data we explicitly want stripped."""
-    from PIL import Image
     import piexif
+    from PIL import Image
 
     img = Image.new("RGB", (64, 64), (200, 100, 50))
     # ((deg, 1), (min, 1), (sec, 1)) — SF: 37° 46' 30" N, 122° 25' 10" W
@@ -553,7 +552,7 @@ async def test_upload_animated_gif_strips_comment_metadata(
         for name in files:
             full = os.path.join(root, name)
             if name == "anim.gif" and os.path.basename(root) == "original":
-                with open(full, "rb") as fh:
+                with open(full, "rb") as fh:  # noqa: ASYNC230
                     saved = fh.read()
                 break
         if saved:
@@ -595,7 +594,7 @@ async def test_upload_strips_exif_from_jpeg_original(
         for name in files:
             full = os.path.join(root, name)
             if name == "with_gps.jpg" and "/original/" in full:
-                with open(full, "rb") as fh:
+                with open(full, "rb") as fh:  # noqa: ASYNC230
                     saved = fh.read()
                 break
         if saved is not None:
@@ -650,7 +649,7 @@ async def test_upload_mp4_extracts_meta_and_poster(
     assert body["blurhash"]
     # Both files (original mp4 + small jpeg poster) landed on disk.
     on_disk: list[str] = []
-    for root, _dirs, files in os.walk(_media_root_tmpdir):
+    for _root, _dirs, files in os.walk(_media_root_tmpdir):
         on_disk.extend(files)
     assert on_disk.count("clip.mp4") == 2
 

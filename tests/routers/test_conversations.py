@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import AccountConversation, Conversation
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 _BOB_TOKEN = "bob-token"
 _BOB_AUTH = {"Authorization": f"Bearer {_BOB_TOKEN}"}

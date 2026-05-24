@@ -20,7 +20,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import Marker
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
 

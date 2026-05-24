@@ -13,7 +13,7 @@ pagination cursors would desync.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -23,10 +23,10 @@ from app.python.common.snowflake import id_at, now_id, to_time
 @pytest.mark.parametrize(
     "ts",
     [
-        datetime(2016, 1, 1, tzinfo=timezone.utc),
-        datetime(2020, 6, 15, 12, 34, 56, tzinfo=timezone.utc),
-        datetime(2025, 1, 1, tzinfo=timezone.utc),
-        datetime(2030, 12, 31, 23, 59, 59, tzinfo=timezone.utc),
+        datetime(2016, 1, 1, tzinfo=UTC),
+        datetime(2020, 6, 15, 12, 34, 56, tzinfo=UTC),
+        datetime(2025, 1, 1, tzinfo=UTC),
+        datetime(2030, 12, 31, 23, 59, 59, tzinfo=UTC),
     ],
 )
 def test_id_at_layout(ts: datetime) -> None:
@@ -43,46 +43,46 @@ def test_id_at_layout(ts: datetime) -> None:
 
 
 def test_id_at_without_random_is_deterministic() -> None:
-    ts = datetime(2024, 3, 1, tzinfo=timezone.utc)
+    ts = datetime(2024, 3, 1, tzinfo=UTC)
     expected = (int(ts.timestamp()) * 1000) << 16
     assert id_at(ts, with_random=False) == expected
     assert id_at(ts, with_random=False) == expected
 
 
 def test_to_time_round_trip() -> None:
-    ts = datetime(2024, 3, 1, 8, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(2024, 3, 1, 8, 0, 0, tzinfo=UTC)
     value = id_at(ts, with_random=False)
     assert to_time(value) == ts
 
 
 def test_to_time_truncates_to_seconds() -> None:
-    ts = datetime(2024, 3, 1, 8, 0, 0, 999_999, tzinfo=timezone.utc)
+    ts = datetime(2024, 3, 1, 8, 0, 0, 999_999, tzinfo=UTC)
     value = id_at(ts, with_random=False)
     assert to_time(value) == ts.replace(microsecond=0)
 
 
 def test_naive_datetime_treated_as_utc() -> None:
     naive = datetime(2024, 3, 1, 8, 0, 0)
-    aware = naive.replace(tzinfo=timezone.utc)
+    aware = naive.replace(tzinfo=UTC)
     assert id_at(naive, with_random=False) == id_at(aware, with_random=False)
 
 
 def test_now_id_is_recent() -> None:
-    before = datetime.now(tz=timezone.utc) - timedelta(seconds=2)
+    before = datetime.now(tz=UTC) - timedelta(seconds=2)
     value = now_id()
-    after = datetime.now(tz=timezone.utc) + timedelta(seconds=2)
+    after = datetime.now(tz=UTC) + timedelta(seconds=2)
 
     decoded = to_time(value)
     assert before.replace(microsecond=0) <= decoded <= after.replace(microsecond=0)
 
 
 def test_ids_are_monotonic_by_second() -> None:
-    earlier = id_at(datetime(2024, 1, 1, tzinfo=timezone.utc), with_random=False)
-    later = id_at(datetime(2024, 1, 1, 0, 0, 1, tzinfo=timezone.utc), with_random=False)
+    earlier = id_at(datetime(2024, 1, 1, tzinfo=UTC), with_random=False)
+    later = id_at(datetime(2024, 1, 1, 0, 0, 1, tzinfo=UTC), with_random=False)
     assert earlier < later
 
 
 def test_low_16_bits_can_span_full_range() -> None:
-    ts = datetime(2024, 3, 1, tzinfo=timezone.utc)
+    ts = datetime(2024, 3, 1, tzinfo=UTC)
     tails = {id_at(ts) & 0xFFFF for _ in range(4096)}
     assert len(tails) > 1000, "tail randomness collapsed to a tiny set"

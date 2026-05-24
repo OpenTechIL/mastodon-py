@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tests.conftest import FakeEnqueuer
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
 
@@ -71,7 +70,7 @@ async def test_following_a_remote_enqueues_follow_activity(
     )
     assert response.status_code == 200
 
-    [(name, args)] = [
+    [(_name, args)] = [
         c for c in fake_enqueuer.calls if c[0] == "deliver_activity"
     ]
     activity, sender_id, inbox_urls = args

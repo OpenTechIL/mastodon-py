@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import io
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +41,7 @@ async def _insert_pending_attachment(
     file_size: int,
 ) -> int:
     """Seed an alice + a PROCESSING-state attachment owned by her."""
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     async with session_factory() as s:
         s.add_all(
             [

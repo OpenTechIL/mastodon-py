@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.rsa import (
     RSAPrivateKey,
@@ -14,9 +16,9 @@ from app.python.models import Account
 
 
 def _make_local_account(**overrides) -> Account:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     defaults = {
         "id": 1,
         "username": "alice",

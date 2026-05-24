@@ -13,7 +13,7 @@ text search) will graduate the fixture to `pytest-postgresql`.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import bcrypt
 import pytest
@@ -45,7 +45,7 @@ def _hash_password(plaintext: str) -> str:
 
 @pytest.fixture
 def fixed_now() -> datetime:
-    return datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    return datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 
 @pytest.fixture

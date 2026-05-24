@@ -9,8 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.python.models import FeaturedTag, StatusTag, Tag, TagFollow, Visibility
-
+from app.python.models import FeaturedTag, StatusTag, Tag, TagFollow
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 

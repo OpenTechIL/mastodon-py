@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any
 
 import pytest
@@ -10,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import FeaturedTag
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
@@ -173,9 +173,9 @@ async def test_delete_other_accounts_featured_404(
 ) -> None:
     """Bob owns a featured tag; alice can't delete it."""
     await _seed(session_factory, seed_data)
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    ts = datetime.now(tz=UTC).replace(tzinfo=None)
     async with session_factory() as s:
         from app.python.models import Tag
 

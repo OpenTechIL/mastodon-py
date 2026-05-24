@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -12,12 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import Block, Follow, Mute
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
 
 def _make_follow(follow_id: int, *, follower: int, target: int) -> Follow:
-    ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    ts = datetime.now(tz=UTC).replace(tzinfo=None)
     return Follow(
         id=follow_id,
         account_id=follower,
@@ -122,7 +121,7 @@ async def test_blocked_user_cannot_see_blockers_statuses(
         s.add(seed_data["make_status"](id_=100, account_id=2, text="public"))
         s.add(seed_data["make_status_stat"](status_id=100))
         # Bob blocks alice (manually inserted to avoid needing bob's token)
-        ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             Block(
                 id=500,

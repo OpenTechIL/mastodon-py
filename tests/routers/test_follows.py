@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any
 
 import pytest
@@ -10,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import AccountStat, Follow, FollowRequest, Visibility
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
@@ -192,9 +192,9 @@ async def test_relationships_batched(
     # carol follows alice — exercises followed_by
 
     async with session_factory() as s:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             Follow(
                 id=99,

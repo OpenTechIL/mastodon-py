@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -10,8 +10,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.python.models import Poll, PollVote
-
+from app.python.models import Poll
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 _BOB_TOKEN = "bob-token"

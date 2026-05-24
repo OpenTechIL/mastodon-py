@@ -7,7 +7,7 @@ actually remote followers to deliver to.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -17,9 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.common.snowflake import now_id
 from app.python.models import Account, Follow
-
 from tests.conftest import FakeEnqueuer
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
@@ -62,7 +60,7 @@ async def _seed_remote_follower(
             )
         )
         s.add(seed_data["make_account_stat"](account_id=id_))
-        now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        now = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             Follow(
                 id=now_id(),
@@ -121,7 +119,7 @@ async def test_public_post_enqueues_deliver_activity_for_remote_followers(
 
     deliveries = [c for c in fake_enqueuer.calls if c[0] == "deliver_activity"]
     assert len(deliveries) == 1
-    name, args = deliveries[0]
+    _name, args = deliveries[0]
     activity, sender_id, inbox_urls = args
     assert activity["type"] == "Create"
     assert activity["object"]["content"] == "hello federation"

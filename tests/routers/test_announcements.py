@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -11,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import Announcement, AnnouncementMute
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
@@ -23,7 +22,7 @@ def _make_announcement(
     published: bool = True,
     ends_at: datetime | None = None,
 ) -> Announcement:
-    ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    ts = datetime.now(tz=UTC).replace(tzinfo=None)
     return Announcement(
         id=id_,
         text=text,
@@ -80,7 +79,7 @@ async def test_index_excludes_expired(
     seed_data: dict[str, Any],
 ) -> None:
     await _seed(session_factory, seed_data)
-    yesterday = datetime.now(tz=timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+    yesterday = datetime.now(tz=UTC).replace(tzinfo=None) - timedelta(days=1)
     async with session_factory() as s:
         s.add(_make_announcement(id_=1, text="alive"))
         s.add(_make_announcement(id_=2, text="expired", ends_at=yesterday))

@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import AccountDomainBlock, Report
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
 

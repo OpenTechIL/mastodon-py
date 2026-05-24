@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -11,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import Account, AccountStat, Follow, FollowRequest
-
 
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
@@ -36,7 +35,7 @@ async def _seed(
         # Lock alice and create a pending request from bob -> alice.
         alice = (await s.execute(select(Account).where(Account.id == 1))).scalar_one()
         alice.locked = True
-        ts = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.now(tz=UTC).replace(tzinfo=None)
         s.add(
             FollowRequest(
                 id=10,

@@ -7,7 +7,6 @@ signature verified, actor URL returned.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -84,16 +83,15 @@ async def test_verify_with_local_account_returns_actor_url(
         priv, actor_url=actor_url, host="example.test", path="/inbox", body=body
     )
 
-    async with session_factory() as s:
-        async with httpx.AsyncClient() as client:
-            verified = await verify_signed_request(
-                method="POST",
-                path="/inbox",
-                headers=headers,
-                body=body,
-                session=s,
-                http_client=client,
-            )
+    async with session_factory() as s, httpx.AsyncClient() as client:
+        verified = await verify_signed_request(
+            method="POST",
+            path="/inbox",
+            headers=headers,
+            body=body,
+            session=s,
+            http_client=client,
+        )
     assert verified == actor_url
 
 
@@ -117,16 +115,15 @@ async def test_verify_with_remote_actor_fetches_key(
 
     async with respx.mock() as router:
         router.get(actor_url).respond(json=actor_json)
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                verified = await verify_signed_request(
-                    method="POST",
-                    path="/inbox",
-                    headers=headers,
-                    body=body,
-                    session=s,
-                    http_client=client,
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            verified = await verify_signed_request(
+                method="POST",
+                path="/inbox",
+                headers=headers,
+                body=body,
+                session=s,
+                http_client=client,
+            )
     assert verified == actor_url
 
 
@@ -154,12 +151,11 @@ async def test_verify_rejects_tampered_body(
     )
     tampered = b'{"type":"Delete"}'
 
-    async with session_factory() as s:
-        async with httpx.AsyncClient() as client:
-            verified = await verify_signed_request(
-                method="POST", path="/inbox", headers=headers,
-                body=tampered, session=s, http_client=client,
-            )
+    async with session_factory() as s, httpx.AsyncClient() as client:
+        verified = await verify_signed_request(
+            method="POST", path="/inbox", headers=headers,
+            body=tampered, session=s, http_client=client,
+        )
     assert verified is None
 
 
@@ -177,12 +173,11 @@ async def test_verify_returns_none_when_key_cannot_be_resolved(
 
     async with respx.mock() as router:
         router.get(actor_url).respond(status_code=404)
-        async with session_factory() as s:
-            async with httpx.AsyncClient() as client:
-                verified = await verify_signed_request(
-                    method="POST", path="/inbox", headers=headers,
-                    body=body, session=s, http_client=client,
-                )
+        async with session_factory() as s, httpx.AsyncClient() as client:
+            verified = await verify_signed_request(
+                method="POST", path="/inbox", headers=headers,
+                body=body, session=s, http_client=client,
+            )
     assert verified is None
 
 
@@ -190,13 +185,12 @@ async def test_verify_returns_none_when_key_cannot_be_resolved(
 async def test_verify_returns_none_when_signature_header_missing(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    async with session_factory() as s:
-        async with httpx.AsyncClient() as client:
-            verified = await verify_signed_request(
-                method="POST", path="/inbox",
-                headers={"Host": "x", "Content-Type": "application/activity+json"},
-                body=b"{}", session=s, http_client=client,
-            )
+    async with session_factory() as s, httpx.AsyncClient() as client:
+        verified = await verify_signed_request(
+            method="POST", path="/inbox",
+            headers={"Host": "x", "Content-Type": "application/activity+json"},
+            body=b"{}", session=s, http_client=client,
+        )
     assert verified is None
 
 
@@ -204,16 +198,15 @@ async def test_verify_returns_none_when_signature_header_missing(
 async def test_verify_returns_none_when_signature_malformed(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    async with session_factory() as s:
-        async with httpx.AsyncClient() as client:
-            verified = await verify_signed_request(
-                method="POST", path="/inbox",
-                headers={
-                    "Host": "x",
-                    "Signature": "this-is-not-a-real-signature-header",
-                },
-                body=b"{}", session=s, http_client=client,
-            )
+    async with session_factory() as s, httpx.AsyncClient() as client:
+        verified = await verify_signed_request(
+            method="POST", path="/inbox",
+            headers={
+                "Host": "x",
+                "Signature": "this-is-not-a-real-signature-header",
+            },
+            body=b"{}", session=s, http_client=client,
+        )
     assert verified is None
 
 
@@ -241,10 +234,9 @@ async def test_verify_strips_fragment_in_returned_actor_url(
     headers = _sign_post(
         priv, actor_url=actor_url, host="example.test", path="/inbox", body=body
     )
-    async with session_factory() as s:
-        async with httpx.AsyncClient() as client:
-            verified = await verify_signed_request(
-                method="POST", path="/inbox", headers=headers,
-                body=body, session=s, http_client=client,
-            )
+    async with session_factory() as s, httpx.AsyncClient() as client:
+        verified = await verify_signed_request(
+            method="POST", path="/inbox", headers=headers,
+            body=body, session=s, http_client=client,
+        )
     assert verified == actor_url  # no `#main-key` suffix

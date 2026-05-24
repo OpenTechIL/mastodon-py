@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -12,12 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.models import Account, Follow
 
-
 _AUTH = {"Authorization": "Bearer raw-token-abc"}
 
 
 def _make_follow(follow_id: int, *, follower: int, target: int) -> Follow:
-    now = datetime.now(tz=timezone.utc).replace(tzinfo=None)
+    now = datetime.now(tz=UTC).replace(tzinfo=None)
     return Follow(
         id=follow_id,
         account_id=follower,

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import bcrypt
@@ -14,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.python.auth import otp as otp_module
 from app.python.models import OAuthAccessToken, OAuthApplication
-
 
 # ---------- /api/v1/apps ----------
 

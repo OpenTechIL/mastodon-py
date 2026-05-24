@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -33,7 +33,7 @@ def rsa_keypair() -> tuple[bytes, bytes]:
     return private_pem, public_pem
 
 
-_SIGN_NOW = datetime(2026, 5, 18, 12, 0, 0, tzinfo=timezone.utc)
+_SIGN_NOW = datetime(2026, 5, 18, 12, 0, 0, tzinfo=UTC)
 
 
 def _build_post(rsa_keypair: tuple[bytes, bytes]) -> tuple[dict[str, str], bytes]:

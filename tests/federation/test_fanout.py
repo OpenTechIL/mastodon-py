@@ -14,7 +14,6 @@ from app.python.federation.fanout import (
     deliver_to_inboxes,
 )
 
-
 # ---------- collect_inbox_urls ----------
 
 

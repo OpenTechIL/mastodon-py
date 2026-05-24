@@ -7,9 +7,6 @@ the wire format is symmetric with the inbound side.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
-
 import httpx
 import pytest
 import respx
@@ -52,7 +49,7 @@ class _Sender:
 async def test_delivery_signs_and_posts_body(
     keypair: tuple[bytes, bytes],
 ) -> None:
-    priv, pub = keypair
+    priv, _pub = keypair
     sender = _Sender("https://us.test/users/alice", priv)
     activity = {"type": "Follow", "actor": sender.uri, "object": "https://other.test/users/bob"}
 

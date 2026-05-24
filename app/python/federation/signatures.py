@@ -37,7 +37,7 @@ import hashlib
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from email.utils import format_datetime, parsedate_to_datetime
 
 from cryptography.exceptions import InvalidSignature

@@ -83,7 +83,7 @@ RUN \
   # Update package list and upgrade system packages
   apt-get update; \
   apt-get dist-upgrade -yq; \
-  # Install necessary runtime components
+  # Install runtime components
   apt-get install -y --no-install-recommends \
   curl \
   file \
@@ -94,154 +94,11 @@ RUN \
   # PostgreSQL client library (asyncpg runtime dep)
   libpq5 \
   libssl3t64 \
-  # libvips runtime components
-  libcgif0 \
-  libexif12 \
-  libheif1 \
-  libhwy1t64 \
-  libimagequant0 \
-  libjpeg62-turbo \
-  liblcms2-2 \
-  libspng0 \
-  libtiff6 \
-  libwebp7 \
-  libwebpdemux2 \
-  libwebpmux3 \
-  # ffmpeg runtime components
-  libdav1d7 \
-  libmp3lame0 \
-  libopencore-amrnb0 \
-  libopencore-amrwb0 \
-  libopus0 \
-  libsnappy1v5 \
-  libtheora0 \
-  libvorbis0a \
-  libvorbisenc2 \
-  libvorbisfile3 \
-  libvpx9 \
-  libx264-164 \
-  libx265-215 \
+  # libvips (Debian trixie ships 8.15.x)
+  libvips42 \
+  # ffmpeg (Debian trixie ships 7.1.x)
+  ffmpeg \
   ;
-
-# Build stage for media libraries (libvips, ffmpeg)
-FROM ${BASE_REGISTRY}/python:${PYTHON_VERSION}-slim-${DEBIAN_VERSION} AS media-build
-
-ARG TARGETPLATFORM
-
-# Set default shell used for running commands
-SHELL ["/bin/bash", "-o", "pipefail", "-o", "errexit", "-c"]
-
-# hadolint ignore=DL3008
-RUN \
-  --mount=type=cache,id=apt-native-cache-${TARGETPLATFORM},target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,id=apt-native-lib-${TARGETPLATFORM},target=/var/lib/apt,sharing=locked \
-  # Remove automatic apt cache Docker cleanup scripts
-  rm -f /etc/apt/apt.conf.d/docker-clean; \
-  # Install build tools for native libraries
-  apt-get update; \
-  apt-get install -y --no-install-recommends \
-  autoconf \
-  automake \
-  build-essential \
-  libtool \
-  meson \
-  nasm \
-  pkg-config \
-  xz-utils \
-  # libvips components
-  libcgif-dev \
-  libexif-dev \
-  libexpat1-dev \
-  libgirepository1.0-dev \
-  libglib2.0-dev \
-  libheif-dev \
-  libhwy-dev \
-  libimagequant-dev \
-  libjpeg62-turbo-dev \
-  liblcms2-dev \
-  libspng-dev \
-  libtiff-dev \
-  libwebp-dev \
-  # ffmpeg components
-  libdav1d-dev \
-  liblzma-dev \
-  libmp3lame-dev \
-  libopus-dev \
-  libsnappy-dev \
-  libvorbis-dev \
-  libvpx-dev \
-  libx264-dev \
-  libx265-dev \
-  ;
-
-# Create temporary libvips specific build layer
-FROM media-build AS libvips
-
-# libvips version to compile, change with [--build-arg VIPS_VERSION="8.15.2"]
-# renovate: datasource=github-releases depName=libvips packageName=libvips/libvips
-ARG VIPS_VERSION=8.18.2
-# libvips download URL, change with [--build-arg VIPS_URL="https://github.com/libvips/libvips/releases/download"]
-ARG VIPS_URL=https://github.com/libvips/libvips/releases/download
-
-WORKDIR /usr/local/libvips/src
-# Download and extract libvips source code
-ADD ${VIPS_URL}/v${VIPS_VERSION}/vips-${VIPS_VERSION}.tar.xz /usr/local/libvips/src/
-RUN tar xf vips-${VIPS_VERSION}.tar.xz;
-
-WORKDIR /usr/local/libvips/src/vips-${VIPS_VERSION}
-
-# Configure libvips
-RUN meson setup build --prefix /usr/local/libvips --libdir=lib -Ddeprecated=false -Dintrospection=disabled -Dmodules=disabled -Dexamples=false
-
-WORKDIR /usr/local/libvips/src/vips-${VIPS_VERSION}/build
-
-# Compile and install libvips
-RUN ninja && ninja install
-
-# Create temporary ffmpeg specific build layer
-FROM media-build AS ffmpeg
-
-# ffmpeg version to compile, change with [--build-arg FFMPEG_VERSION="7.0.x"]
-# renovate: datasource=github-tags depName=FFmpeg/FFmpeg extractVersion=^n(?<version>\d+\.\d+(\.\d+)?)$
-ARG FFMPEG_VERSION=8.1.1
-# ffmpeg download URL, change with [--build-arg FFMPEG_URL="https://ffmpeg.org/releases"]
-ARG FFMPEG_URL=https://github.com/FFmpeg/FFmpeg/archive/refs/tags
-
-WORKDIR /usr/local/ffmpeg/src
-# Download and extract ffmpeg source code
-ADD ${FFMPEG_URL}/n${FFMPEG_VERSION}.tar.gz /usr/local/ffmpeg/src/
-RUN tar xf n${FFMPEG_VERSION}.tar.gz && mv FFmpeg-n${FFMPEG_VERSION} ffmpeg-${FFMPEG_VERSION};
-
-WORKDIR /usr/local/ffmpeg/src/ffmpeg-${FFMPEG_VERSION}
-
-# Configure and compile ffmpeg
-RUN \
-  ./configure \
-  --prefix=/usr/local/ffmpeg \
-  --toolchain=hardened \
-  --disable-debug \
-  --disable-devices \
-  --disable-doc \
-  --disable-ffplay \
-  --disable-network \
-  --disable-static \
-  --enable-ffmpeg \
-  --enable-ffprobe \
-  --enable-gpl \
-  --enable-libdav1d \
-  --enable-libmp3lame \
-  --enable-libopus \
-  --enable-libsnappy \
-  --enable-libvorbis \
-  --enable-libvpx \
-  --enable-libwebp \
-  --enable-libx264 \
-  --enable-libx265 \
-  --enable-shared \
-  --enable-version3 \
-  ; \
-  make -j"$(( $(nproc) > 4 ? 4 : $(nproc) ))"; \
-  make install;
 
 # Build Python dependencies with uv
 FROM python AS python-deps
@@ -252,10 +109,13 @@ ARG TARGETPLATFORM
 RUN \
   --mount=type=cache,id=apt-cache-${TARGETPLATFORM},target=/var/cache/apt,sharing=locked \
   --mount=type=cache,id=apt-lib-${TARGETPLATFORM},target=/var/lib/apt,sharing=locked \
+  apt-get update; \
   apt-get install -y --no-install-recommends \
   build-essential \
   libpq-dev \
   libssl-dev \
+  # libvips dev headers needed to compile pyvips C extension
+  libvips-dev \
   ;
 
 # Install uv
@@ -264,12 +124,6 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
   UV_LINK_MODE=copy \
   VIRTUAL_ENV=/opt/venv
-
-# Copy libvips headers/libs needed by pyvips at install time
-COPY --from=libvips /usr/local/libvips/lib /usr/local/lib
-COPY --from=libvips /usr/local/libvips/include /usr/local/include
-
-RUN ldconfig
 
 # Install Python dependencies from lockfile into a named virtualenv
 COPY pyproject.toml uv.lock /opt/mastodon/
@@ -289,6 +143,10 @@ ARG TARGETPLATFORM
 COPY --from=node /usr/local/bin /usr/local/bin
 COPY --from=node /usr/local/lib /usr/local/lib
 
+# Limit Node.js heap and yarn network concurrency for memory-constrained builds
+ENV NODE_OPTIONS="--max-old-space-size=512" \
+  YARN_NETWORK_CONCURRENCY="1"
+
 RUN \
   # Mount local Corepack and Yarn caches from Docker buildx caches
   --mount=type=cache,id=corepack-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/corepack,sharing=locked \
@@ -305,8 +163,7 @@ COPY . /opt/mastodon/
 RUN \
   --mount=type=cache,id=corepack-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/corepack,sharing=locked \
   --mount=type=cache,id=yarn-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/yarn,sharing=locked \
-  # Install Node.js packages (production only)
-  yarn workspaces focus --production @mastodon/mastodon;
+  yarn install --immutable;
 
 RUN \
   --mount=type=cache,id=corepack-cache-${TARGETPLATFORM},target=/usr/local/share/.cache/corepack,sharing=locked \
@@ -324,24 +181,14 @@ ARG TARGETPLATFORM
 # Copy Mastodon sources into final layer
 COPY . /opt/mastodon/
 
-# Copy compiled frontend assets
-COPY --from=assets /opt/mastodon/public/packs /opt/mastodon/public/packs
-COPY --from=assets /opt/mastodon/public/assets /opt/mastodon/public/assets
 # Copy installed Python virtualenv
 COPY --from=python-deps /opt/venv /opt/venv
 # Copy uv for runtime use (migrations, etc.)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-# Copy libvips components
-COPY --from=libvips /usr/local/libvips/bin /usr/local/bin
-COPY --from=libvips /usr/local/libvips/lib /usr/local/lib
-# Copy ffmpeg components
-COPY --from=ffmpeg /usr/local/ffmpeg/bin /usr/local/bin
-COPY --from=ffmpeg /usr/local/ffmpeg/lib /usr/local/lib
 
 RUN \
-  ldconfig; \
   # Smoketest media processors
-  vips -v; \
+  vips --version; \
   ffmpeg -version; \
   ffprobe -version;
 

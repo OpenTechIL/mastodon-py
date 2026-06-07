@@ -96,6 +96,8 @@ RUN \
   libssl3t64 \
   # libvips (Debian trixie ships 8.15.x)
   libvips42 \
+  # libvips CLI tools (provides the `vips` binary used by the smoketest)
+  libvips-tools \
   # ffmpeg (Debian trixie ships 7.1.x)
   ffmpeg \
   ;
